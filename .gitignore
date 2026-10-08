@@ -1,0 +1,12 @@
+
+# C++ artifacts
+**.exe
+build/
+
+# Python artifacts
+__pycache__/
+.venv/
+
+# AI artifacts
+.claude/
+CLAUDE.md
