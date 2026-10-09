@@ -12,6 +12,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <chrono>
 #include "algorithms/random.hpp"
 #include "algorithms/nearest_endpoint.hpp"
 #include "algorithms/nearest_anypoint.hpp"
@@ -44,13 +45,14 @@ int main() {
     if (!statistics.is_open()) {
         throw std::runtime_error("Could not open file: " + statistics_file);
     }
-    statistics << "instance;method;min;max;average\n";
+    statistics << "instance;method;min;max;average;avg_time(microsec)\n";
     statistics << std::fixed << std::setprecision(2);
     std::cout << std::fixed << std::setprecision(2);
 
     for (const std::string& instance : instances) {
         const std::string input_file = "data/input/" + instance + ".csv";
         const algorithm_data data = parse_csv(input_file);
+        long long average_time(0);
 
         for (const auto& [method_name, algorithm] : methods) {
             // greedy methods start once from each node, random is just run the same number of times
@@ -62,8 +64,13 @@ int main() {
             long long sum_weight = 0;
 
             for (int i = 0; i < data.nodes_num; ++i) {
+                const auto start_time = std::chrono::high_resolution_clock::now();
                 algorithm_result result = start_node_algorithm ? start_node_algorithm->run(data, i)
                                                                : algorithm->run(data);
+                const auto end_time = std::chrono::high_resolution_clock::now();
+                const auto elapsed = 
+                    std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+                average_time += elapsed.count();
                 const std::string error = check_solution(data, result);
                 if (!error.empty()) {
                     std::cerr << "Invalid solution (" << instance << ", " << method_name << "): " << error << '\n';
@@ -79,9 +86,10 @@ int main() {
 
             algorithm->save_result_to_file(best, output_dir + "/" + instance + "_" + method_name + ".txt", input_file);
             statistics << instance << ';' << method_name << ';' << best.total_weight << ';'
-                       << max_weight << ';' << average_weight << '\n';
+                       << max_weight << ';' << average_weight << ';' << average_time / data.nodes_num << '\n';
             std::cout << instance << " " << method_name << ": min " << best.total_weight
-                      << ", max " << max_weight << ", average " << average_weight << '\n';
+                      << ", max " << max_weight << ", average " << average_weight 
+                      << ", average time " << average_time / data.nodes_num << " μs\n";
         }
     }
 
