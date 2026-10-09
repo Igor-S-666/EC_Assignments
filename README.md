@@ -15,7 +15,7 @@ All labs solve the same problem, a variant of the TSP. Each node has a position 
 ## Repo structure
 
 ```
-├───build                       compiled executables (not tracked)
+├───build                       compiled executables (not committed)
 ├───data
 │   ├───input                   problem instances (TSPA.csv, TSPB.csv)
 │   └───lab_1                   one folder per lab
@@ -24,15 +24,14 @@ All labs solve the same problem, a variant of the TSP. Each node has a position 
 │       └───results             statistics of the objective function
 ├───docs                        problem description
 ├───reports
-│   └───lab_1                   report (Markdown) and pseudocodes, one folder per lab
+│   └───lab_1                   report (PDF), one folder per lab
 └───src
     ├───types.hpp               shared data types
     ├───algorithm_base.hpp      AlgorithmBase and StartNodeAlgorithm base classes
     ├───lab_1                   one folder per lab
     │   ├───main.cpp            experiment for the lab
-    │   ├───requirements.md     lab assignment
     │   └───algorithms          algorithms implemented in the lab
-    │        └────<algorithm>.hpp
+    │        └─<algorithm>.hpp
     └───utils
         ├───checker             solution checker
         ├───generation          generators of synthetic instances (not used now)
@@ -50,6 +49,8 @@ The C++ code is header-only: every lab is built from a single `main.cpp`.
 ## Usage
 
 All commands are run from the repository root.
+
+The usage is similar for all labs, just replace `lab_1` with the lab number, and add proper method names to the plotting commands.
 
 Build and run (e.g. lab 1):
 
@@ -72,6 +73,7 @@ The first command saves one plot per output file. The second saves one compariso
 ## Adding a new lab
 
 1. Create `src/lab_X/` with `main.cpp` and the algorithms in `src/lab_X/algorithms/`.
-2. Derive algorithms from `AlgorithmBase` (implement `run(data)`), or from `StartNodeAlgorithm` if they start from a given node (implement `run(data, start_node)` and add `using StartNodeAlgorithm::run;`).
-3. Save results to `data/lab_X/output/<instance>_<method>.txt`, so the plotting scripts work without changes.
-4. Put the report in `reports/lab_X/`.
+2. Derive algorithms from `AlgorithmBase` (implement `run(data)`), or from `StartNodeAlgorithm` if they start from a given node (implement `run(data, start_node)` and add `using StartNodeAlgorithm::run;`). Input and output types are defined in `src/types.hpp`.
+3. Code for running experiments and saving results is in `src/lab_X/main.cpp`. Use `utils::parse_instance()` to read the instance, and `utils::save_solution()` to save the best solution. Use `utils::check_solution()` to verify correctness (see lab1 main.cpp for an example).
+4. Save results to `data/lab_X/output/<instance>_<method>.txt`, so the plotting scripts work without changes.
+5. Put the report in `reports/lab_X/`.
