@@ -1,6 +1,6 @@
 ---
 title: "Evolutionary Computation – Lab 1"
-author: "Igor Szymczak"
+author: "Julia Mirońska, Igor Szymczak"
 ---
 
 ## Problem Description
