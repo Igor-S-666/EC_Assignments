@@ -46,14 +46,16 @@ public:
             int nearest_node = -1;
             std::size_t insertion_point = 0;
             int nearest_distance = std::numeric_limits<int>::max();
+            int n = path.size();
             for (int j = 0; j < data.nodes_num; j++) {
                 if (!in_path[j]) {
                     // try inserting j into every edge (path[k], path[k+1]) of the cycle, including the closing one
-                    for (std::size_t k = 0; k < path.size(); k++) {
+                    const std::vector<int>& cost_matrix = data.cost_matrix[j];
+                    for (std::size_t k = 0; k < n; k++) {
                         int current_node = path[k];
-                        int next_node = path[(k + 1) % path.size()];
+                        int next_node = path[k + 1 == n ? 0 : k + 1];
                         int distance = (data.cost_matrix[current_node][j]
-                                        + data.cost_matrix[j][next_node]
+                                        + cost_matrix[next_node]
                                         - data.cost_matrix[current_node][next_node]);
                         if (distance < nearest_distance) {
                             nearest_distance = distance;

@@ -57,6 +57,7 @@ int main() {
         for (const auto& [method_name, algorithm] : methods) {
             // greedy methods start once from each node, random is just run the same number of times
             auto* start_node_algorithm = dynamic_cast<StartNodeAlgorithm*>(algorithm);
+            long long average_time(0);
 
             algorithm_result best;
             best.total_weight = std::numeric_limits<int>::max();
