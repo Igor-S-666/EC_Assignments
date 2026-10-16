@@ -30,7 +30,7 @@ public:
         std::vector<bool> in_path(data.nodes_num, false);
         in_path[start_node] = true;
 
-        for (int i = 0; i < final_nodes_num-1; i++) {
+        for (int i = 0; i < final_nodes_num - 1; i++) {
             int nearest_node = -1;
             std::size_t insertion_point = 0;
             int nearest_distance = std::numeric_limits<int>::max();
