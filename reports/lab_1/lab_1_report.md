@@ -105,18 +105,18 @@ Each greedy method was run 200 times per instance, once from each node. The rand
 | Method | Min | Max | Average | Time ($\mu$s) |
 |---|---:|---:|---:|---:|
 | Random | 232767 | 290020 | 263132.65 | **1** |
-| Nearest neighbor (end) | 84362 | 90075 | 87476.63 | 42 |
-| Nearest neighbor (any position) | **72328** | 77022 | 74346.96 | 653 |
-| Greedy cycle | 72590 | **75281** | **73797.39** | 2076 |
+| Nearest neighbor (end) | 84362 | 90075 | 87476.63 | 26 |
+| Nearest neighbor (any position) | **72328** | 77022 | 74346.96 | 612 |
+| Greedy cycle | 72590 | **75281** | **73797.39** | 525 |
 
 : Results for instance TSPB
 
 | Method | Min | Max | Average | Time ($\mu$s) |
 |---|---:|---:|---:|---:|
 | Random | 185482 | 232014 | 206682.99 | **0** |
-| Nearest neighbor (end) | 56007 | **63166** | **59397.33** | 30 |
-| Nearest neighbor (any position) | **52915** | 66164 | 59475.50 | 646 |
-| Greedy cycle | 53016 | 63736 | 59709.47 | 2121 |
+| Nearest neighbor (end) | 56007 | **63166** | **59397.33** | 25 |
+| Nearest neighbor (any position) | **52915** | 66164 | 59475.50 | 576 |
+| Greedy cycle | 53016 | 63736 | 59709.47 | 520 |
 
 The best value in each column for each instance is in bold.
 
