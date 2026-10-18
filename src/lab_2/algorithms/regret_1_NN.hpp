@@ -33,16 +33,18 @@ public:
         path.push_back(start_node);
         std::vector<bool> in_path(data.nodes_num, false);
         in_path[start_node] = true;
-
+        int distance;
         for (int i = 0; i < final_nodes_num - 1; i++) {
             int best_node = -1;
-            std::size_t insertion_point = 0;
+            int insertion_point = 0;
             int greatest_regret = std::numeric_limits<int>::min();
             for (int j = 0; j < data.nodes_num; j++) {
                 if (!in_path[j]) {
-                    std::vector<std::pair<int, std::size_t>> options;
-                    for (std::size_t k = 0; k <= path.size(); k++) {
-                        int distance;
+                    // Track the cheapest and second-cheapest insertion over every position
+                    int best_cost = std::numeric_limits<int>::max();
+                    int second_cost = std::numeric_limits<int>::max();
+                    int best_position = 0;
+                    for (int k = 0; k <= path.size(); k++) {
                         if (k == 0) {
                             // Insert at the beginning
                             distance = data.distance_matrix[j][path[0]] + data.node_weights[j];
@@ -56,21 +58,24 @@ public:
                                      - data.cost_matrix[path[k - 1]][path[k]];
                         }
 
-                        options.push_back({distance, k});
+                        if (distance < best_cost) {
+                            second_cost = best_cost;
+                            best_cost = distance;
+                            best_position = k;
+                        } else if (distance < second_cost) {
+                            second_cost = distance;
+                        }
                     }
 
-                    // Sort insertion options from cheapest to most expensive
-                    std::sort(options.begin(), options.end());
-
                     // 2-regret: difference between the second-best and best options
-                    int regret = options.size() >= 2
-                               ? options[1].first - options[0].first
-                               : 0;
+                    int regret = second_cost == std::numeric_limits<int>::max()
+                               ? 0
+                               : second_cost - best_cost;
 
                     if (best_node == -1 || regret > greatest_regret) {
                         greatest_regret = regret;
                         best_node = j;
-                        insertion_point = options[0].second;
+                        insertion_point = best_position;
                     }
                 }
             }

@@ -52,7 +52,10 @@ public:
             double best_score = -std::numeric_limits<double>::infinity();
             for (int j = 0; j < data.nodes_num; j++) {
                 if (!in_path[j]) {
-                    std::vector<std::pair<int, std::size_t>> options;
+                    // Track the cheapest and second-cheapest insertion over every position
+                    int best_cost = std::numeric_limits<int>::max();
+                    int second_cost = std::numeric_limits<int>::max();
+                    std::size_t best_position = 0;
                     for (std::size_t k = 0; k <= path.size(); k++) {
                         int distance;
                         if (k == 0) {
@@ -69,26 +72,29 @@ public:
                                      - data.cost_matrix[path[k - 1]][path[k]];
                         }
 
-                        options.push_back({distance, k});
+                        if (distance < best_cost) {
+                            second_cost = best_cost;
+                            best_cost = distance;
+                            best_position = k;
+                        } else if (distance < second_cost) {
+                            second_cost = distance;
+                        }
                     }
 
-                    // Sort insertion options from cheapest to most expensive
-                    std::sort(options.begin(), options.end());
-
                     // 2-regret: second-best cost minus best cost
-                    int regret = options.size() >= 2
-                               ? options[1].first - options[0].first
-                               : 0;
+                    int regret = second_cost == std::numeric_limits<int>::max()
+                               ? 0
+                               : second_cost - best_cost;
 
                     // Weighted sum: favor high regret and low insertion cost
                     double score =
                         regret_weight * regret
-                        - cost_weight * options[0].first;
+                        - cost_weight * best_cost;
 
                     if (best_node == -1 || score > best_score) {
                         best_score = score;
                         best_node = j;
-                        insertion_point = options[0].second;
+                        insertion_point = best_position;
                     }
                 }
             }

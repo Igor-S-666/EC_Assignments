@@ -56,9 +56,11 @@ public:
 
             for (int j = 0; j < data.nodes_num; j++) {
                 if (!in_path[j]) {
-                    std::vector<std::pair<int, std::size_t>> options;
                     const std::vector<int>& cost_matrix = data.cost_matrix[j];
-                    // Calculate the insertion cost for every edge of the cycle
+                    // Track the cheapest and second-cheapest insertion over every edge of the cycle
+                    int best_cost = std::numeric_limits<int>::max();
+                    int second_cost = std::numeric_limits<int>::max();
+                    std::size_t best_position = 0;
                     for (int k = 0; k < n; k++) {
                         int current_node = path[k];
                         int next_node = path[k + 1 == n ? 0 : k + 1];
@@ -66,21 +68,24 @@ public:
                                      + cost_matrix[next_node]
                                      - data.cost_matrix[current_node][next_node];
 
-                        options.push_back({distance, static_cast<std::size_t>(k + 1)});
+                        if (distance < best_cost) {
+                            second_cost = best_cost;
+                            best_cost = distance;
+                            best_position = k + 1;
+                        } else if (distance < second_cost) {
+                            second_cost = distance;
+                        }
                     }
 
-                    // Sort insertion options from cheapest to most expensive
-                    std::sort(options.begin(), options.end());
-
                     // 2-regret: difference between the second-best and best options
-                    int regret = options.size() >= 2
-                               ? options[1].first - options[0].first
-                               : 0;
+                    int regret = second_cost == std::numeric_limits<int>::max()
+                               ? 0
+                               : second_cost - best_cost;
 
                     if (best_node == -1 || regret > greatest_regret) {
                         greatest_regret = regret;
                         best_node = j;
-                        insertion_point = options[0].second;
+                        insertion_point = best_position;
                     }
                 }
             }
