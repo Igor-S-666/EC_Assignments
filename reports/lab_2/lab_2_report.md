@@ -9,12 +9,13 @@ We are given three columns of integers, with one row for each node. The first tw
 
 The distances between nodes are calculated as Euclidean distances rounded mathematically to integer values. The distance matrix is calculated just after reading an instance, so the optimization methods can use the distance matrix without accessing node coordinates.
 
-More formally, let \(V\) be a set of \(n\) nodes. Each node \(j\in V\) has coordinates \((x_j,y_j)\) and a cost \(c_j\). Let \(d(i,j)\) be the Euclidean distance between nodes \(i\) and \(j\), rounded to an integer. The task is to find a cycle \(P=(p_0,p_1,\ldots,p_{k-1})\), where all nodes are distinct and \(k=\lceil n/2\rceil\), that minimizes the objective function
+More formally, we may define the problem as follows:
 
-\[
-f(P)=\sum_{i=0}^{k-1}d(p_i,p_{(i+1)\bmod k})
-+\sum_{i=0}^{k-1}c_{p_i}.
-\]
+Let $V$ be a set of $n$ nodes, each node $j \in V$ has coordinates $(x_j, y_j)$ and a cost $c_j$. Let $d(i,j) = \text{euclidean}(x_i, y_i, x_j, y_j)$ be the distance between nodes $i$ and $j$. The task is to find a cycle $P = (p_0, p_1, \dots, p_{k-1})$, where $p_i \in V$, all $p_i$ are distinct, and $k = \lceil n/2 \rceil$, that minimizes the objective function, defined as:
+
+$$f(P) = \sum_{i=0}^{k-1} d(p_i, p_{(i+1)}) + \sum_{i=0}^{k-1} c_{p_i}$$
+
+where $p_{k} = p_0$.
 
 ### Instances
 
@@ -37,7 +38,7 @@ When inserting node \(j\) between consecutive nodes \(a\) and \(b\), the change 
 
 The term \(d(a,j)+d(j,b)-d(a,b)\) represents the change in the total travel distance caused by replacing the edge \((a,b)\) with edges \((a,j)\) and \((j,b)\). The term \(c_j\) is the cost of selecting node \(j\).
 
-For each unselected node \(j\), we evaluate the objective-function change for all feasible insertion positions and sort these values in ascending order. Let \(\Delta_1(j)\) be the smallest insertion cost and \(\Delta_2(j)\) the second-smallest insertion cost.
+For each unselected node \(j\), we evaluate the objective-function change for all feasible insertion positions and keep the two smallest values. Let \(\Delta_1(j)\) be the smallest insertion cost and \(\Delta_2(j)\) the second-smallest insertion cost.
 
 The 2-regret value is defined as
 
@@ -65,7 +66,6 @@ The procedure is repeated until the path contains the required number of nodes.
 \WHILE{$|P| < k$}
     \FORALL{$j \notin P$}
         \STATE Calculate insertion costs for all feasible positions of $j$
-        \STATE Sort insertion costs in ascending order
         \STATE $\Delta_1(j) \gets$ smallest insertion cost
         \STATE $\Delta_2(j) \gets$ second-smallest insertion cost
         \STATE $R_2(j) \gets \Delta_2(j) - \Delta_1(j)$
@@ -96,14 +96,13 @@ The main difference between the two 2-regret methods is that the nearest neighbo
 \WHILE{$|P| < k$}
     \FORALL{$j \notin P$}
         \STATE Calculate insertion costs for all feasible positions of $j$ in the cycle
-        \STATE Sort insertion costs in ascending order
         \STATE $\Delta_1(j) \gets$ smallest insertion cost
         \STATE $\Delta_2(j) \gets$ second-smallest insertion cost
         \STATE $R_2(j) \gets \Delta_2(j) - \Delta_1(j)$
     \ENDFOR
     \STATE $j^* \gets \arg\max_{j \notin P} R_2(j)$
     \STATE Insert $j^*$ into $P$ at its cheapest position
-ENDWHILE
+\ENDWHILE
 \RETURN $P$
 \end{algorithmic}
 \end{algorithm}
@@ -131,7 +130,6 @@ The custom configuration assigns a larger coefficient to the cheapest insertion 
 Both the nearest neighbor and greedy cycle variants are implemented using the weighted criterion.
 
 
-nearest neighbor variant
 ```latex
 \begin{algorithm}
 \caption{Weighted 2-regret nearest neighbor}
@@ -141,7 +139,6 @@ nearest neighbor variant
 \WHILE{$|P| < k$}
     \FORALL{$j \notin P$}
         \STATE Calculate insertion costs for all feasible positions of $j$
-        \STATE Sort insertion costs in ascending order
         \STATE $\Delta_1(j) \gets$ smallest insertion cost
         \STATE $\Delta_2(j) \gets$ second-smallest insertion cost
         \STATE $R_2(j) \gets \Delta_2(j) - \Delta_1(j)$
@@ -155,8 +152,6 @@ nearest neighbor variant
 \end{algorithm}
 ```
 
-greedy cycle variant
-
 ```latex
 \begin{algorithm}
 \caption{Weighted 2-regret cycle}
@@ -166,7 +161,6 @@ greedy cycle variant
 \WHILE{$|P| < k$}
     \FORALL{$j \notin P$}
         \STATE Calculate insertion costs for all feasible positions of $j$ in the cycle
-        \STATE Sort insertion costs in ascending order
         \STATE $\Delta_1(j) \gets$ smallest insertion cost
         \STATE $\Delta_2(j) \gets$ second-smallest insertion cost
         \STATE $R_2(j) \gets \Delta_2(j) - \Delta_1(j)$
@@ -190,31 +184,31 @@ For each method and instance, the minimum, maximum, and average objective values
 
 | Method | Min | Max | Average | Time (\(\mu s\)) |
 |---|---:|---:|---:|---:|
-| Random | 232767 | 290020 | 263132.65 | 1 |
-| Nearest neighbor (end) | 84362 | 90075 | 87476.63 | 42 |
-| Nearest neighbor (any position) | **72328** | 77022 | 74346.96 | 653 |
-| Greedy cycle | 72590 | 75281 | 73797.39 | 2076 |
-| 2-regret nearest neighbor | 111527 | 133181 | 122860.66 | 63998 |
-| 2-regret greedy cycle | 112654 | 130924 | 121007.17 | 55631 |
-| Weighted 2-regret nearest neighbor (equal) | 72419 | 78504 | 75561.20 | 65139 |
-| Weighted 2-regret greedy cycle (equal) | 72011 | 75532 | 73348.72 | 77411 |
-| Weighted 2-regret nearest neighbor (0.3, 0.7) | 72283 | 78210 | 75303.05 | 89809 |
-| Weighted 2-regret greedy cycle (0.3, 0.7) | 72347 | **75162** | **73348.22** | 57384 |
+| Random | 232767 | 290020 | 263132.65 | **1** |
+| Nearest neighbor (end) | 84362 | 90075 | 87476.63 | 36 |
+| Nearest neighbor (any position) | 72328 | 77022 | 74346.96 | 612 |
+| Greedy cycle | 72590 | 75281 | 73797.39 | 525 |
+| 2-regret nearest neighbor | 111527 | 133181 | 122860.66 | 1034 |
+| 2-regret greedy cycle | 112654 | 130924 | 121007.17 | 873 |
+| Weighted 2-regret nearest neighbor (equal) | 72419 | 78504 | 75561.20 | 940 |
+| Weighted 2-regret greedy cycle (equal) | **72011** | 75532 | 73348.72 | 917 |
+| Weighted 2-regret nearest neighbor (0.3, 0.7) | 72283 | 78210 | 75303.05 | 912 |
+| Weighted 2-regret greedy cycle (0.3, 0.7) | 72347 | **75162** | **73348.22** | 940 |
 
 ### Results for instance TSPB
 
 | Method | Min | Max | Average | Time (\(\mu s\)) |
 |---|---:|---:|---:|---:|
-| Random | 185482 | 232014 | 206682.99 | 0 |
-| Nearest neighbor (end) | 56007 | **63166** | 59397.33 | 30 |
-| Nearest neighbor (any position) | 52915 | 66164 | 59475.50 | 646 |
-| Greedy cycle | 53016 | 63736 | 59709.47 | 2121 |
-| 2-regret nearest neighbor | 69032 | 80767 | 74763.39 | 167875 |
-| 2-regret greedy cycle | 69455 | 78142 | 73403.35 | 152317 |
-| Weighted 2-regret nearest neighbor (equal) | **50485** | 61406 | **55698.34** | 150967 |
-| Weighted 2-regret greedy cycle (equal) | 52731 | 63370 | 57895.54 | 116916 |
-| Weighted 2-regret nearest neighbor (0.3, 0.7) | 51534 | 64840 | 56435.25 | 64082 |
-| Weighted 2-regret greedy cycle (0.3, 0.7) | 52522 | 62491 | 55951.54 | 99111 |
+| Random | 185482 | 232014 | 206682.99 | **0** |
+| Nearest neighbor (end) | 56007 | 63166 | 59397.33 | 25 |
+| Nearest neighbor (any position) | 52915 | 66164 | 59475.50 | 576 |
+| Greedy cycle | 53016 | 63736 | 59709.47 | 520 |
+| 2-regret nearest neighbor | 69032 | 80767 | 74763.39 | 1113 |
+| 2-regret greedy cycle | 69455 | 78142 | 73403.35 | 890 |
+| Weighted 2-regret nearest neighbor (equal) | **50485** | **61406** | **55698.34** | 960 |
+| Weighted 2-regret greedy cycle (equal) | 52731 | 63370 | 57895.54 | 913 |
+| Weighted 2-regret nearest neighbor (0.3, 0.7) | 51534 | 64840 | 56435.25 | 899 |
+| Weighted 2-regret greedy cycle (0.3, 0.7) | 52522 | 62491 | 55951.54 | 917 |
 
 The best value in each column for each instance is highlighted in bold. Since the objective function is minimized, lower values are better for the minimum, maximum, and average columns. Lower runtime values indicate faster execution.
 
@@ -231,16 +225,14 @@ In the plots, node color represents node cost, using a common color scale for ea
 The comparison figures show the best solutions found by the available methods for each instance. The solutions illustrate how the different node-selection criteria influence the distribution of selected nodes and the resulting cycle.
 
 ```latex
-\section{Best Solutions}
-
 The following tables summarize the best solutions obtained by the
 2-regret and weighted 2-regret algorithms for the TSPA and TSPB
 instances. The complete paths returned by the algorithms are listed
 below each table.
 
-\subsection{TSPA}
+\subsubsection{TSPA}
 
-\begin{table}[ht]
+\begin{table}[H]
 \centering
 \caption{Objective values of the selected solutions for TSPA}
 \begin{tabular}{lr}
@@ -257,7 +249,7 @@ Weighted 2-regret nearest neighbor (50:50) & 72419 \\
 \end{tabular}
 \end{table}
 
-\subsubsection{2-regret greedy cycle}
+\paragraph{2-regret greedy cycle}
 
 \begin{verbatim}
 133 139 112 5 175 39 154 62 34 109 186 136 24 163 19 29 17 101
@@ -270,7 +262,7 @@ Weighted 2-regret nearest neighbor (50:50) & 72419 \\
 
 Total weight: 112654
 
-\subsubsection{2-regret nearest neighbor}
+\paragraph{2-regret nearest neighbor}
 
 \begin{verbatim}
 199 82 116 119 11 49 108 152 123 160 12 97 120 92 171 166 183
@@ -283,7 +275,7 @@ Total weight: 112654
 
 Total weight: 111527
 
-\subsubsection{Weighted 2-regret greedy cycle (30:70)}
+\paragraph{Weighted 2-regret greedy cycle (30:70)}
 
 \begin{verbatim}
 71 4 76 132 180 28 102 185 35 156 51 16 67 144 140 53 179 52
@@ -296,7 +288,7 @@ Total weight: 111527
 
 Total weight: 72347
 
-\subsubsection{Weighted 2-regret greedy cycle (50:50)}
+\paragraph{Weighted 2-regret greedy cycle (50:50)}
 
 \begin{verbatim}
 31 60 116 149 63 168 11 49 108 152 100 123 83 160 97 127 161
@@ -309,7 +301,7 @@ Total weight: 72347
 
 Total weight: 72011
 
-\subsubsection{Weighted 2-regret nearest neighbor (30:70)}
+\paragraph{Weighted 2-regret nearest neighbor (30:70)}
 
 \begin{verbatim}
 31 48 80 91 157 71 4 76 132 90 123 83 160 180 28 102 185 35
@@ -322,7 +314,7 @@ Total weight: 72011
 
 Total weight: 72283
 
-\subsubsection{Weighted 2-regret nearest neighbor (50:50)}
+\paragraph{Weighted 2-regret nearest neighbor (50:50)}
 
 \begin{verbatim}
 171 2 189 187 30 141 87 45 73 135 114 181 192 158 58 84 134
@@ -336,9 +328,9 @@ Total weight: 72283
 Total weight: 72419
 
 
-\subsection{TSPB}
+\subsubsection{TSPB}
 
-\begin{table}[ht]
+\begin{table}[H]
 \centering
 \caption{Objective values of the selected solutions for TSPB}
 \begin{tabular}{lr}
@@ -355,7 +347,7 @@ Weighted 2-regret nearest neighbor (50:50) & 50485 \\
 \end{tabular}
 \end{table}
 
-\subsubsection{2-regret greedy cycle}
+\paragraph{2-regret greedy cycle}
 
 \begin{verbatim}
 167 82 88 163 99 171 17 74 20 14 9 93 23 110 118 131 148 10
@@ -368,7 +360,7 @@ Weighted 2-regret nearest neighbor (50:50) & 50485 \\
 
 Total weight: 69455
 
-\subsubsection{2-regret nearest neighbor}
+\paragraph{2-regret nearest neighbor}
 
 \begin{verbatim}
 57 44 89 32 43 48 58 198 121 195 50 42 116 37 13 149 145 65
@@ -381,7 +373,7 @@ Total weight: 69455
 
 Total weight: 69032
 
-\subsubsection{Weighted 2-regret greedy cycle (30:70)}
+\paragraph{Weighted 2-regret greedy cycle (30:70)}
 
 \begin{verbatim}
 60 157 45 134 175 71 36 197 132 29 6 180 115 170 177 125
@@ -395,7 +387,7 @@ Total weight: 69032
 
 Total weight: 52522
 
-\subsubsection{Weighted 2-regret greedy cycle (50:50)}
+\paragraph{Weighted 2-regret greedy cycle (50:50)}
 
 \begin{verbatim}
 91 36 197 132 29 6 180 115 170 177 125 26 97 154 140 47
@@ -409,7 +401,7 @@ Total weight: 52522
 
 Total weight: 52731
 
-\subsubsection{Weighted 2-regret nearest neighbor (30:70)}
+\paragraph{Weighted 2-regret nearest neighbor (30:70)}
 
 \begin{verbatim}
 62 175 134 45 157 60 71 155 141 40 33 64 47 21 183 30 38
@@ -422,7 +414,7 @@ Total weight: 52731
 
 Total weight: 51534
 
-\subsubsection{Weighted 2-regret nearest neighbor (50:50)}
+\paragraph{Weighted 2-regret nearest neighbor (50:50)}
 
 \begin{verbatim}
 65 145 28 149 13 146 37 116 147 42 50 130 63 121 198 96
@@ -442,7 +434,7 @@ Every generated solution was verified using the solution checker implemented in 
 
 The checker recalculates the objective function using the distance matrix and node costs. It also verifies that each solution contains exactly \(\lceil n/2\rceil\) nodes, that all node indices are valid, and that no node occurs more than once. The objective value calculated by the checker is compared with the value reported by the algorithm.
 
-All generated solutions should pass these checks before the results are submitted. The best solutions can additionally be verified using the checker provided on ekursy.
+All generated solutions (200 per instance and method, 2400 in total) passed these checks. The best solutions can additionally be verified using the checker provided on ekursy.
 
 ## Conclusions
 
@@ -454,14 +446,12 @@ All generated solutions should pass these checks before the results are submitte
 
 - **The best weight configuration depends on the instance and the heuristic.** On TSPA, the weighted greedy cycle variants have nearly identical averages. On TSPB, equal weights give better averages for both the nearest neighbor and greedy cycle variants. The custom weights do not consistently improve solution quality, so the experiments do not support the conclusion that assigning a larger coefficient to the immediate insertion cost is always beneficial.
 
-- **The regret-based methods are considerably slower than the original greedy heuristics.** The new methods take approximately 55–90 milliseconds per run on TSPA and 64–168 milliseconds on TSPB. In comparison, the original greedy cycle takes about 2 milliseconds, while nearest neighbor with insertion at any position takes less than 1 millisecond. The regret-based methods evaluate insertion alternatives for many unselected nodes at every iteration, increasing their computational cost.
+- **The regret-based methods are somewhat slower than the original greedy heuristics.** The new methods take approximately 0.87–1.03 milliseconds per run on TSPA and 0.89–1.11 milliseconds on TSPB. In comparison, the original greedy cycle takes about 0.52 milliseconds, and nearest neighbor with insertion at any position about 0.6 milliseconds. The regret-based methods evaluate the same insertions as the original methods, but must find the best and second-best insertion cost separately for every unselected node, which makes them roughly 1.7–2 times slower.
 
-- **The results differ between the two instances.** On TSPA, the improvement of the weighted methods over the original greedy cycle is relatively small. On TSPB, the weighted nearest neighbor with equal weights provides a more noticeable improvement. The unweighted 2-regret methods perform poorly on both instances, indicating that regret alone is not a sufficient selection criterion for these problems.
-
-Overall, the experiments show that combining regret with the cheapest insertion cost is more effective than selecting nodes based only on regret. The weighted greedy cycle is the strongest variant on TSPA, while the weighted nearest neighbor with equal weights performs best on TSPB. These improvements come at the cost of considerably longer runtimes.
+- **The results differ between the two instances.** On TSPA, the improvement of the weighted methods over the original greedy cycle is relatively small. On TSPB, the weighted nearest neighbor with equal weights provides a more noticeable improvement. The unweighted 2-regret methods perform poorly on both instances.
 
 ## Source Code
 
-The implementation is available in the project repository. The regret-based algorithms are located in `src/lab_2/algorithms/`, and the computational experiment is implemented in `src/lab_2/main.cpp`.
+The implementation is available at [github.com/Igor-S-666/EC_Assignments](https://github.com/Igor-S-666/EC_Assignments/tree/main/src/lab_1). The algorithms are in `src/lab_1/algorithms/`, and the experiment is in `src/lab_1/main.cpp`.
 
-The plotting utilities are located in `src/utils/plotting/`.
+For detailed structure, see the README in the source code repository.
