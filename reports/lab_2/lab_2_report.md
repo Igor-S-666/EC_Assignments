@@ -452,6 +452,6 @@ All generated solutions (200 per instance and method, 2400 in total) passed thes
 
 ## Source Code
 
-The implementation is available at [github.com/Igor-S-666/EC_Assignments](https://github.com/Igor-S-666/EC_Assignments/tree/main/src/lab_1). The algorithms are in `src/lab_1/algorithms/`, and the experiment is in `src/lab_1/main.cpp`.
+The implementation is available at [github.com/Igor-S-666/EC_Assignments](https://github.com/Igor-S-666/EC_Assignments/tree/main/src/lab_2). The algorithms are in `src/lab_2/algorithms/`, and the experiment is in `src/lab_2/experiments/` and `src/lab_2/main.cpp`.
 
 For detailed structure, see the README in the source code repository.
