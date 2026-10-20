@@ -1,0 +1,17 @@
+instance;method;min;max;average;avg_time(microsec);min_time(microsec);max_time(microsec)
+TSPA;greedy_node_random;80852;96854;87875.52;725;469;1528
+TSPA;greedy_node_greedy_cycle;72415;74736;73478.34;799;670;1549
+TSPA;greedy_edge_random;74146;78532;76342.58;467;344;813
+TSPA;greedy_edge_greedy_cycle;72088;74565;73164.54;814;684;1101
+TSPA;steepest_node_random;83000;98690;90293.09;2769;2099;3842
+TSPA;steepest_node_greedy_cycle;72415;74736;73468.17;591;512;996
+TSPA;steepest_edge_random;73440;79726;76191.55;1176;924;1589
+TSPA;steepest_edge_greedy_cycle;72088;74544;73167.85;574;498;1119
+TSPB;greedy_node_random;58487;70640;63592.77;704;390;1337
+TSPB;greedy_node_greedy_cycle;52707;63607;59331.08;826;659;1391
+TSPB;greedy_edge_random;50667;55260;52869.81;478;342;1011
+TSPB;greedy_edge_greedy_cycle;51715;63178;58728.54;904;741;1555
+TSPB;steepest_node_random;59827;74954;65919.13;2836;2139;6516
+TSPB;steepest_node_greedy_cycle;52588;63607;59322.68;648;523;1153
+TSPB;steepest_edge_random;50091;54983;52575.82;1194;1005;1744
+TSPB;steepest_edge_greedy_cycle;52523;63178;58736.80;647;562;1043
