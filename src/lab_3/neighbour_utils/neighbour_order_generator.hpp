@@ -1,43 +1,47 @@
-/** @file main.cpp
- *  @brief FIle for generating neighbour order for the TSP problem.
+/** @file neighbour_order_generator.hpp
+ *  @brief File for generating neighbour order for the TSP problem.
  */
 
+#pragma once
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <limits>
-#include <stdexcept>
-#include <string>
-#include <utility>
-#include <vector>
 #include <array>
 #include <random>
+#include <stdexcept>
+#include <vector>
+#include "../types.hpp"
 
 class NeighbourOrderGenerator {
 
-    int num_nodes;
+    int path_size;
+    int unselected_size;
     std::mt19937 rng;
 public:
-    NeighbourOrderGenerator(int seed = 0, int num_nodes) : num_nodes(num_nodes), rng(seed) {
-        if (num_nodes <= 0) {
-            throw std::invalid_argument("Number of nodes must be positive.");
+    NeighbourOrderGenerator(unsigned seed, int path_size, int unselected_size)
+        : path_size(path_size), unselected_size(unselected_size), rng(seed) {
+        if (path_size <= 0 || unselected_size < 0) {
+            throw std::invalid_argument("Path size must be positive and unselected size non-negative.");
         }
     }
 
-    std::vector<std::array<int, 3>> generate_neighbour_order() {
+    neighbour_orders_t generate_neighbour_order() {
         /**
-        * @brief Generate neighbour order for the TSP problem; contains both intra and inter neighborhood
+        * @brief Generate neighbour order for the TSP problem; contains both intra and inter neighborhood.
+        * Path positions are padded, so they are in range 1..path_size.
         */
-        for (int i = 0; i < num_nodes; ++i) {
-            for (int j = i + 1; j < num_nodes; ++j) {
+        neighbour_orders_t neighbour_orders;
+        neighbour_orders.reserve(path_size * (path_size - 1) / 2 + path_size * unselected_size);
+        // a cycle of <= 2 nodes has a single arrangement; intra cost formulas
+        // assume distinct neighbours and would report fake improvements there
+        const int intra_limit = path_size > 2 ? path_size : 0;
+        for (int i = 1; i <= path_size; ++i) {
+            for (int j = i + 1; j <= intra_limit; ++j) {
                 neighbour_orders.push_back({i, j, 0});
-                neighbour_orders.push_back({i, j, 1}); 
+            }
+            for (int k = 0; k < unselected_size; ++k) {
+                neighbour_orders.push_back({i, k, 1});
             }
         }
         std::shuffle(neighbour_orders.begin(), neighbour_orders.end(), rng);
         return neighbour_orders;
-    }    
+    }
 };
-        
