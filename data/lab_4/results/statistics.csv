@@ -1,0 +1,5 @@
+instance;method;min;max;average;avg_time(microsec);min_time(microsec);max_time(microsec)
+TSPA;steepest_edge_random_baseline;73440;79726;76191.55;149031;118209;278849
+TSPA;steepest_edge_random_candidates;73758;79511;76235.09;53326;41562;92493
+TSPB;steepest_edge_random_baseline;50091;54983;52575.82;154787;124338;294255
+TSPB;steepest_edge_random_candidates;50382;55096;52553.58;48372;35444;146692
