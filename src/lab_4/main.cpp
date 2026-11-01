@@ -1,6 +1,7 @@
 
 /** @file main.cpp
- *  @brief Compare baseline and candidate-based steepest local search.
+ *  @brief Compare baseline and candidate-based steepest local search,
+ *         and sweep the candidate list size K.
  */
 
 #include <algorithm>
@@ -13,6 +14,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "algorithms/local_search_steepest.hpp"
@@ -20,12 +22,6 @@
 #include "../utils/parsing/data_parser.hpp"
 
 using clock_type = std::chrono::steady_clock;
-
-struct local_search_method {
-    std::string name;
-    std::unique_ptr<LocalSearchSteepest> algorithm;
-    bool use_candidates;
-};
 
 struct run_statistics {
     long long total_time = 0;
@@ -35,13 +31,44 @@ struct run_statistics {
     long long sum_weight = 0;
     int max_weight = std::numeric_limits<int>::min();
 
-    algorithm_result best;
+    algorithm_result best{{}, std::numeric_limits<int>::max()};
+
+    void add(algorithm_result result, long long elapsed) {
+        total_time += elapsed;
+        min_time = std::min(min_time, elapsed);
+        max_time = std::max(max_time, elapsed);
+
+        sum_weight += result.total_weight;
+        max_weight = std::max(max_weight, result.total_weight);
+        if (result.total_weight < best.total_weight) {
+            best = std::move(result);
+        }
+    }
+
+    void write(std::ostream& out, int runs) const {
+        out << best.total_weight << ';' << max_weight << ';'
+            << static_cast<double>(sum_weight) / runs << ';'
+            << static_cast<double>(total_time) / runs << ';'
+            << min_time << ';' << max_time << '\n';
+    }
+};
+
+struct method {
+    std::string name;
+    int k;  // candidate list size, 0 = full neighbourhood (baseline)
+    bool in_sweep;  // reported in k_sweep.csv instead of statistics.csv
+    // One object per method, with the same seed, kept across instances (as in
+    // Lab 3): every method gets the same sequence of random starting solutions,
+    // and the baseline reproduces the Lab 3 results.
+    std::unique_ptr<LocalSearchSteepest> algorithm;
 };
 
 int main() {
     constexpr unsigned seed = 42;
     constexpr int number_of_runs = 200;
     constexpr int candidate_list_size = 10;
+    constexpr int sweep_min_k = 1;
+    constexpr int sweep_max_k = 20;
 
     const std::vector<std::string> instances = {"TSPA", "TSPB"};
 
@@ -55,153 +82,107 @@ int main() {
     std::filesystem::create_directories(output_dir);
     std::filesystem::create_directories(results_dir);
 
-    std::vector<local_search_method> methods;
-    methods.reserve(2);
+    std::vector<method> methods;
+    methods.push_back({"steepest_edge_random_baseline", 0, false,
+                       std::make_unique<LocalSearchSteepest>(seed)});
+    methods.push_back({"steepest_edge_random_candidates", candidate_list_size, false,
+                       std::make_unique<LocalSearchSteepest>(seed)});
+    for (int k = sweep_min_k; k <= sweep_max_k; ++k) {
+        methods.push_back({"candidates_k" + std::to_string(k), k, true,
+                           std::make_unique<LocalSearchSteepest>(seed)});
+    }
 
-    methods.push_back({
-        "steepest_edge_random_baseline",
-        std::make_unique<LocalSearchSteepest>(seed),
-        false
-    });
-
-    methods.push_back({
-        "steepest_edge_random_candidates",
-        std::make_unique<LocalSearchSteepest>(seed),
-        true
-    });
-
-    const std::string statistics_file =
-        results_dir + "/statistics.csv";
+    const std::string statistics_file = results_dir + "/statistics.csv";
+    const std::string sweep_file = results_dir + "/k_sweep.csv";
 
     std::ofstream statistics(statistics_file);
-
+    std::ofstream sweep(sweep_file);
     if (!statistics) {
-        throw std::runtime_error(
-            "Could not open file: " + statistics_file);
+        throw std::runtime_error("Could not open file: " + statistics_file);
+    }
+    if (!sweep) {
+        throw std::runtime_error("Could not open file: " + sweep_file);
     }
 
     statistics
         << "instance;method;min;max;average;"
         << "avg_time(microsec);min_time(microsec);max_time(microsec)\n";
-
+    sweep
+        << "instance;k;min;max;average;"
+        << "avg_time(microsec);min_time(microsec);max_time(microsec)\n";
     statistics << std::fixed << std::setprecision(2);
+    sweep << std::fixed << std::setprecision(2);
 
     for (const std::string& instance : instances) {
-        const std::string input_file =
-            "data/input/" + instance + ".csv";
-
+        const std::string input_file = "data/input/" + instance + ".csv";
         const algorithm_data data = parse_csv(input_file);
 
-        // Candidate preprocessing is performed once per instance.
-        const auto preprocessing_start = clock_type::now();
+        // Candidate lists are built once per instance and K (not timed per run).
+        std::vector<std::unique_ptr<CandidateMoveGenerator>> generators;
+        for (const method& m : methods) {
+            if (m.k == 0) {
+                generators.push_back(nullptr);
+                continue;
+            }
+            const auto start = clock_type::now();
+            generators.push_back(std::make_unique<CandidateMoveGenerator>(data, m.k));
+            if (m.k == candidate_list_size && !m.in_sweep) {
+                std::cout << instance << ": candidate preprocessing (K=" << m.k << ") = "
+                          << std::chrono::duration_cast<std::chrono::microseconds>(
+                                 clock_type::now() - start).count()
+                          << " microseconds\n";
+            }
+        }
 
-        const CandidateMoveGenerator candidates(
-            data, candidate_list_size);
+        // Methods are interleaved run by run, so fluctuations of the machine
+        // load affect all of them equally instead of distorting single methods.
+        std::vector<run_statistics> stats(methods.size());
+        for (int run = 0; run < number_of_runs; ++run) {
+            for (std::size_t i = 0; i < methods.size(); ++i) {
+                LocalSearchSteepest& algorithm = *methods[i].algorithm;
 
-        const auto preprocessing_end = clock_type::now();
-
-        const auto preprocessing_time =
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                preprocessing_end - preprocessing_start).count();
-
-        std::cout << instance
-                  << ": candidate preprocessing = "
-                  << preprocessing_time << " microseconds\n";
-
-        for (auto& method : methods) {
-            run_statistics stats;
-            stats.best.total_weight =
-                std::numeric_limits<int>::max();
-
-            for (int run = 0; run < number_of_runs; ++run) {
                 const auto start = clock_type::now();
-
-                algorithm_result result;
-
-                if (method.use_candidates) {
-                    result = method.algorithm->run_with_candidates(
-                        data,
-                        intra_method,
-                        inter_method,
-                        initial_solution,
-                        0,
-                        candidates
-                    );
-                } else {
-                    result = method.algorithm->run(
-                        data,
-                        intra_method,
-                        inter_method,
-                        initial_solution,
-                        0
-                    );
-                }
-
-                const auto end = clock_type::now();
-
+                algorithm_result result = generators[i]
+                    ? algorithm.run_with_candidates(data, intra_method, inter_method,
+                                                    initial_solution, 0, *generators[i])
+                    : algorithm.run(data, intra_method, inter_method,
+                                    initial_solution, 0);
                 const long long elapsed =
-                    std::chrono::duration_cast<
-                        std::chrono::microseconds>(end - start).count();
-
-                stats.total_time += elapsed;
-                stats.min_time = std::min(stats.min_time, elapsed);
-                stats.max_time = std::max(stats.max_time, elapsed);
+                    std::chrono::duration_cast<std::chrono::microseconds>(
+                        clock_type::now() - start).count();
 
                 // Validation is deliberately outside the timed section.
                 const std::string error = check_solution(data, result);
-
                 if (!error.empty()) {
-                    std::cerr
-                        << "Invalid solution: "
-                        << instance << ", "
-                        << method.name << ", run "
-                        << run + 1 << ": "
-                        << error << '\n';
-
+                    std::cerr << "Invalid solution: " << instance << ", "
+                              << methods[i].name << ", run " << run + 1 << ": "
+                              << error << '\n';
                     return 1;
                 }
 
-                stats.sum_weight += result.total_weight;
-                stats.max_weight = std::max(
-                    stats.max_weight, result.total_weight);
+                stats[i].add(std::move(result), elapsed);
+            }
+        }
 
-                if (result.total_weight < stats.best.total_weight) {
-                    stats.best = std::move(result);
-                }
+        for (std::size_t i = 0; i < methods.size(); ++i) {
+            const method& m = methods[i];
+            const run_statistics& s = stats[i];
+
+            if (m.in_sweep) {
+                sweep << instance << ';' << m.k << ';';
+                s.write(sweep, number_of_runs);
+            } else {
+                m.algorithm->save_result_to_file(
+                    s.best, output_dir + "/" + instance + "_" + m.name + ".txt", input_file);
+                statistics << instance << ';' << m.name << ';';
+                s.write(statistics, number_of_runs);
             }
 
-            const double average_weight =
-                static_cast<double>(stats.sum_weight) /
-                number_of_runs;
-
-            const long long average_time =
-                stats.total_time / number_of_runs;
-
-            const std::string output_file =
-                output_dir + "/" + instance + "_" +
-                method.name + ".txt";
-
-            method.algorithm->save_result_to_file(
-                stats.best, output_file, input_file);
-
-            statistics
-                << instance << ';'
-                << method.name << ';'
-                << stats.best.total_weight << ';'
-                << stats.max_weight << ';'
-                << average_weight << ';'
-                << average_time << ';'
-                << stats.min_time << ';'
-                << stats.max_time << '\n';
-
-            statistics.flush();
-
-            std::cout
-                << instance << " " << method.name
-                << ": best = " << stats.best.total_weight
-                << ", average = " << average_weight
-                << ", average time = " << average_time
-                << " microseconds\n";
+            std::cout << instance << " " << m.name
+                      << ": best = " << s.best.total_weight
+                      << ", average = " << static_cast<double>(s.sum_weight) / number_of_runs
+                      << ", average time = " << static_cast<double>(s.total_time) / number_of_runs
+                      << " microseconds\n";
         }
     }
 

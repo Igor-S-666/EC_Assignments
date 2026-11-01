@@ -182,12 +182,15 @@ public:
         return candidate_edge_count;
     }
 
-    // Reserve once before the search. The same vector can then be reused.
+    // Upper bound on generated moves: each candidate edge yields two moves
+    // (both endpoints selected -> 2-opt, one selected -> exchange) or none.
     std::size_t estimated_max_moves() const {
-        return candidate_edge_count * 4;
+        return candidate_edge_count * 2;
     }
 
-    // Fills an existing vector instead of allocating and returning a new one.
+    // Explicit list of all candidate moves for the current state.
+    // Not used by the search itself (it evaluates moves on the fly, which is
+    // faster); kept as a reference for testing the candidate neighbourhood.
     void generate_neighbour_order(
         const local_search_state& state,
         neighbour_orders_t& moves
