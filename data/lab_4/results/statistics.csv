@@ -1,5 +1,5 @@
 instance;method;min;max;average;avg_time(microsec);min_time(microsec);max_time(microsec)
-TSPA;steepest_edge_random_baseline;73440;79726;76191.55;149031;118209;278849
-TSPA;steepest_edge_random_candidates;73758;79511;76235.09;53326;41562;92493
-TSPB;steepest_edge_random_baseline;50091;54983;52575.82;154787;124338;294255
-TSPB;steepest_edge_random_candidates;50382;55096;52553.58;48372;35444;146692
+TSPA;steepest_edge_random_baseline;73440;79726;76191.55;1561.44;1300;4066
+TSPA;steepest_edge_random_candidates;74039;79511;76255.74;1111.87;960;2080
+TSPB;steepest_edge_random_baseline;50091;54983;52575.82;1580.42;1328;2996
+TSPB;steepest_edge_random_candidates;50382;55096;52539.14;965.73;822;1396
