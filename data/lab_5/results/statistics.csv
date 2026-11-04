@@ -1,0 +1,11 @@
+instance;method;min;max;average;avg_time(microsec);min_time(microsec);max_time(microsec)
+TSPA;steepest_baseline;73440;79726;76191.55;1691.73;1381;4189
+TSPA;steepest_lm;73440;79726;76191.55;557.80;423;1064
+TSPA;candidates_lab4;74039;79511;76255.74;1420.04;1092;6006
+TSPA;candidates;74039;79511;76255.74;814.22;638;2205
+TSPA;lm_candidates;73758;79511;76241.80;491.11;394;832
+TSPB;steepest_baseline;50091;54983;52575.82;1643.55;1324;2351
+TSPB;steepest_lm;50091;54983;52575.82;529.92;418;809
+TSPB;candidates_lab4;50382;55096;52539.14;1158.22;907;1925
+TSPB;candidates;50382;55096;52539.14;673.85;531;1216
+TSPB;lm_candidates;50382;55096;52559.71;447.74;363;790
