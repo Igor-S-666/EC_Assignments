@@ -8,7 +8,7 @@
 
 #pragma once
 #include <vector>
-#include "../types.hpp"
+#include "types.hpp"
 
 /// Cost of swapping nodes at positions i < j, where `first` directly precedes `second` in the cycle.
 inline int adjacent_node_exchange_cost(const distance_matrix_t& cost_matrix,
@@ -42,6 +42,13 @@ inline int intra_edge_exchange_cost(const distance_matrix_t& cost_matrix,
            (cost_matrix[path[i]][path[i + 1]] + cost_matrix[path[j]][path[j + 1]]);
 }
 
+inline int intra_edge_exchange_cost_full(const distance_matrix_t& cost_matrix,
+    int a, int b, int c, int d, const local_search_state& state) {
+    const std::vector<int>& path = state.path;
+    return cost_matrix[a][path[c]] + cost_matrix[path[b]][path[d]] -
+           (cost_matrix[path[a]][path[b]] + cost_matrix[path[c]][path[d]]);
+}
+
 /// Replace node at path position `position` with unselected[unselected_index].
 inline int external_node_exchange_cost(const distance_matrix_t& cost_matrix,
     int position, int unselected_index, const local_search_state& state) {
@@ -51,4 +58,16 @@ inline int external_node_exchange_cost(const distance_matrix_t& cost_matrix,
            + cost_matrix[new_node][path[position + 1]]
            - cost_matrix[path[position - 1]][path[position]]
            - cost_matrix[path[position]][path[position + 1]];
+}
+
+inline int external_node_exchange_cost_full(const distance_matrix_t& cost_matrix,
+    int prev, int curr, int next, int unselected_index, 
+    const local_search_state& state) {
+    const std::vector<int>& path = state.path;
+    const int new_node = state.unselected[unselected_index];
+    return cost_matrix[prev][new_node]
+           + cost_matrix[new_node][next]
+           - cost_matrix[prev][curr]
+           - cost_matrix[curr][next]
+           + cost_matrix[new_node][new_node]; //cost of node itself
 }

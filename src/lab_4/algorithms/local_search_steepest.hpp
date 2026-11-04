@@ -6,9 +6,9 @@
 #include <utility>
 #include <vector>
 
-#include "../types.hpp"
-#include "../neighbour_utils/neighbourhood_moves.hpp"
-#include "../neighbour_utils/candidate.hpp"
+#include "../../utils/neighbour_utils/types.hpp"
+#include "../../utils/neighbour_utils/neighbourhood_moves.hpp"
+#include "../../utils/neighbour_utils/candidate.hpp"
 #include "local_search_base.hpp"
 
 class LocalSearchSteepest : public LocalSearchBase {

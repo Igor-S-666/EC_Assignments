@@ -7,8 +7,8 @@
 #include <vector>
 #include <array>
 
-#include "../types.hpp"
-#include "../neighbour_utils/neighbourhood_moves.hpp"
+#include "../../utils/neighbour_utils/types.hpp"
+#include "../../utils/neighbour_utils/neighbourhood_moves.hpp"
 #include "local_search_base.hpp"
 class LocalSearchSteepest : public LocalSearchBase {
 public:

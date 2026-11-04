@@ -1,12 +1,12 @@
 /**
- * @brief This files contain structures and types used in lab_4.
+ * @brief This file contains structures and types used by local search neighbourhoods.
  */
 
 #pragma once
 #include <array>
 #include <utility>
 #include <vector>
-#include "../types.hpp"
+#include "../../types.hpp"
 
 /// {first, second, exchange_type}; exchange_type 0 = intra (two path positions),
 /// 1 = inter (path position, index into unselected)

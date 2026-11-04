@@ -8,7 +8,7 @@
 #include <random>
 #include <stdexcept>
 #include <vector>
-#include "../types.hpp"
+#include "types.hpp"
 
 class NeighbourOrderGenerator {
 

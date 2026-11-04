@@ -5,13 +5,10 @@
  */
 
 #pragma once
-#include <algorithm>
-#include <cstddef>
 #include <string>
 #include <stdexcept>
 #include "../../algorithm_base.hpp"
 #include "../../types.hpp"
-#include "../types.hpp"
 #include "../../lab_1/algorithms/greedy_cycle.hpp"
 #include "../../lab_1/algorithms/random.hpp"
 

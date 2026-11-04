@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <utility>
 #include <vector>
-#include "../types.hpp"
+#include "types.hpp"
 
 inline void intra_node_swap(local_search_state& state, int i, int j) {
     std::swap(state.path[i], state.path[j]);

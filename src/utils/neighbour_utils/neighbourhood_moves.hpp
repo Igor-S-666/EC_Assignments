@@ -8,7 +8,7 @@
 #pragma once
 #include <stdexcept>
 #include <string>
-#include "../types.hpp"
+#include "types.hpp"
 #include "neighbor_cost_calculator.hpp"
 #include "neighbour_exchanges.hpp"
 

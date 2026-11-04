@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "../types.hpp"
+#include "types.hpp"
 
 class CandidateMoveGenerator {
 private:
