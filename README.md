@@ -14,6 +14,7 @@ All labs solve the same problem, a variant of the TSP. Each node has a position 
 | 2 | Greedy regret heuristics (2-regret and weighted 2-regret, nearest neighbor and greedy cycle) | [reports/lab_2](reports/lab_2/lab_2_report.md) |
 | 3 | Local search (greedy / steepest, two-nodes / two-edges exchange, random / greedy cycle start) | [reports/lab_3](reports/lab_3/lab_3_report.md) |
 | 4 | Candidate moves in steepest local search (incl. candidate list size K sweep) | [reports/lab_4](reports/lab_4/lab_4_report.md) |
+| 5 | Move evaluations from previous iterations (list of improving moves) in steepest local search, also combined with candidate moves | [reports/lab_5](reports/lab_5/lab_5_report.md) |
 
 ## Repo structure
 
