@@ -177,7 +177,7 @@ The following sections describe the operators and the exact meaning of strength 
 
 The Double Bridge operator performs a large modification of the cycle by cutting the route into several parts and reconnecting these parts in a different order.
 
-It is based on a 4-edge exchange and is designed to make a larger change than a simple 2-opt move.
+It is based on a 4-edge exchange and is designed to make a larger change than a simple edge exchange.
 
 The operator preserves the selected nodes but changes their order in the cycle.
 
@@ -789,9 +789,9 @@ Each path represents a cycle through 100 selected nodes. The examples are identi
 
 ## 7. Solution Validation
 
-The solutions should be checked using the solution checker provided with the assignment.
+The solutions were checked using the solution checker provided with the assignment.
 
-The checker should verify that:
+The checker verify that:
 
 1. Each solution contains exactly 100 selected nodes.
 2. Every node identifier is valid for the corresponding instance.
