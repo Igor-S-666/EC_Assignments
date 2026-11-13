@@ -5,6 +5,7 @@ author:
   - Igor Szymczak
 ---
 
+
 # Lab 6 – Iterated Local Search and Perturbation Operators
 
 ## 1. Problem Description
