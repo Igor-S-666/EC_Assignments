@@ -1,0 +1,17 @@
+instance;perturbation;strength;average_LS_runs;min_LS_runs;max_LS_runs
+TSPA;double_bridge;4;4254.95;3689;4585
+TSPA;node_relocation;4;5453.95;5185;5637
+TSPA;segment_shuffle;4;1083.65;985;1153
+TSPA;node_exchange;4;6854.65;6315;7260
+TSPA;segment_relocation;4;4573.05;4258;4730
+TSPA;segment_exchange;4;3033.50;2831;3176
+TSPA;large_2opt;4;6678.35;6267;6985
+TSPA;ruin_recreate;4;2865.10;2782;2994
+TSPB;double_bridge;4;4303.90;3856;4629
+TSPB;node_relocation;4;5525.65;5209;5836
+TSPB;segment_shuffle;4;1069.75;990;1167
+TSPB;node_exchange;4;7503.70;7096;7629
+TSPB;segment_relocation;4;4802.85;4505;4973
+TSPB;segment_exchange;4;3305.25;3195;3489
+TSPB;large_2opt;4;7256.55;6510;7487
+TSPB;ruin_recreate;4;3052.15;2776;3257
