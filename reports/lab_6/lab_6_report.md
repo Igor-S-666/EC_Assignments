@@ -1,798 +1,505 @@
 ---
-title: Evolutionary Computation – Lab 6
-author:
-  - Julia Mirońska
-  - Igor Szymczak
+title: "Evolutionary Computation – Lab 6"
+author: "Julia Mirońska, Igor Szymczak"
 ---
 
+## Problem Description
 
-# Lab 6 – Iterated Local Search and Perturbation Operators
+We are given three columns of integers, with one row for each node. The first two columns contain the \(x\) and \(y\) coordinates of the node positions in a plane. The third column contains node costs. The goal is to select exactly 50% of the nodes (if the number of nodes is odd, we round the number of selected nodes up) and form a Hamiltonian cycle through this set of nodes such that the sum of the total length of the cycle and the total cost of the selected nodes is minimized.
 
-## 1. Problem Description
+The distances between nodes are calculated as Euclidean distances rounded mathematically to integer values. The distance matrix is calculated just after reading an instance, so the optimization methods can use the distance matrix without accessing node coordinates.
 
-The objective of this laboratory assignment is to solve a Travelling Salesperson Problem (TSP) variant in which only a subset of all available nodes must be visited.
+More formally, we may define the problem as follows:
 
-For an instance containing \(n\) nodes, a solution must select exactly
+Let $V$ be a set of $n$ nodes, each node $j \in V$ has coordinates $(x_j, y_j)$ and a cost $c_j$. Let $d(i,j) = \text{euclidean}(x_i, y_i, x_j, y_j)$ be the distance between nodes $i$ and $j$. The task is to find a cycle $P = (p_0, p_1, \dots, p_{k-1})$, where $p_i \in V$, all $p_i$ are distinct, and $k = \lceil n/2 \rceil$, that minimizes the objective function, defined as:
 
-\[
-k = \left\lceil \frac{n}{2} \right\rceil
-\]
+$$f(P) = \sum_{i=0}^{k-1} d(p_i, p_{(i+1)}) + \sum_{i=0}^{k-1} c_{p_i}$$
 
-nodes and arrange them into a Hamiltonian cycle. Each selected node must appear exactly once in the cycle.
+where $p_{k} = p_0$.
 
-The objective function consists of the total distance travelled along the cycle and the costs associated with the selected nodes.
+Both TSPA and TSPB contain 200 nodes, so each solution contains 100 nodes.
 
-For a solution represented by
+## Algorithms
 
-\[
-P = (p_0,p_1,\ldots,p_{k-1}),
-\]
+### Local search
 
-the objective function is
+Both methods use the steepest local search with two-edge exchange as the intra-route move and node exchange (a selected node replaced with an unselected one) as the inter-route move, in the version with the list of improving moves from Lab 5. It gives exactly the same local optima as the basic steepest local search, only faster. Below, \(\text{LS}(P)\) denotes this local search started from the solution \(P\); it returns a local optimum.
 
-\[
-F(P) =
-\sum_{i=0}^{k-1} d(p_i,p_{(i+1)\bmod k})
-+
-\sum_{i=0}^{k-1} c(p_i),
-\]
+### Multiple start local search (MSLS)
 
-where:
+MSLS runs the local search from 400 random solutions and returns the best local optimum. One run of MSLS is therefore 400 runs of the basic local search, and its result is the best of them.
 
-- \(d(p_i,p_j)\) is the distance between nodes \(p_i\) and \(p_j\),
-- \(c(p_i)\) is the cost of selecting node \(p_i\),
-- \(k\) is the required number of selected nodes.
-
-The objective is to find a feasible solution minimizing \(F(P)\).
-
-Two problem instances were considered:
-
-- **TSPA:** 200 available nodes, with 100 nodes selected in each solution.
-- **TSPB:** 200 available nodes, with 100 nodes selected in each solution.
-
-The experiments compare Multi-Start Local Search (MSLS) with Iterated Local Search (ILS) using different perturbation operators.
-
-## 2. Algorithms
-
-### 2.1. Local Search
-
-Local Search is used to improve a given solution by examining possible modifications of its current structure.
-
-The algorithm starts with a feasible solution and searches for a neighbouring solution with a lower objective value. If an improving move is found, it replaces the current solution. The process continues until no improving move can be found.
-
-In this assignment, Local Search works with two types of modifications:
-
-- **Intra-route modifications:** change the order of nodes in the selected cycle.
-- **Inter-route modifications:** exchange a selected node with an unselected node.
-
-The first type changes the order of the cycle while preserving the selected set. The second type changes which nodes belong to the solution.
-
-A common intra-route operation is 2-opt. It removes two edges from the cycle and reconnects the resulting paths in a different way.
-
-If the removed edges are \((a,b)\) and \((c,d)\), and the new edges are \((a,c)\) and \((b,d)\), the change in distance is
-
-\[
-\Delta = d(a,c)+d(b,d)-d(a,b)-d(c,d).
-\]
-
-The move is beneficial when
-
-\[
-\Delta < 0.
-\]
-
-The Local Search terminates when it reaches a local optimum, meaning that none of the examined neighbouring moves improves the current solution.
-
-### 2.2. Multi-Start Local Search (MSLS)
-
-Multi-Start Local Search repeatedly generates new initial solutions and improves each one using Local Search.
-
-The purpose of this algorithm is to explore different parts of the solution space by starting from multiple random solutions. Since Local Search may become trapped in a local optimum, using different initial solutions increases the chance of finding a better result.
-
-The best solution found across all starts is retained.
-
-**Pseudocode:**
-
-```text
-MSLS(number_of_starts):
-
-    best_solution = NONE
-
-    FOR i = 1 TO number_of_starts:
-
-        solution = generate_random_solution()
-
-        solution = local_search(solution)
-
-        IF best_solution is NONE OR
-           solution.cost < best_solution.cost:
-
-            best_solution = solution
-
-    RETURN best_solution
+```latex
+\begin{algorithm}
+\caption{Multiple start local search}
+\begin{algorithmic}
+\STATE $P^* \gets$ none
+\FOR{$i = 1$ \TO $400$}
+    \STATE $P \gets \text{LS}(\text{random solution})$
+    \IF{$P^* =$ none \OR $f(P) < f(P^*)$}
+        \STATE $P^* \gets P$
+    \ENDIF
+\ENDFOR
+\RETURN $P^*$
+\end{algorithmic}
+\end{algorithm}
 ```
 
-In the experiment, MSLS uses 400 starting solutions per run.
+### Iterated local search (ILS)
 
-### 2.3. Iterated Local Search (ILS)
+ILS starts from a local optimum of a random solution and repeats: perturb the current solution, improve the perturbed solution with the local search, and accept the result if it is better than the current solution. The perturbation should move the search to a different part of the solution space, while keeping most of the structure of the current (good) solution. The stopping condition is the average running time of MSLS on the same instance.
 
-Iterated Local Search attempts to improve upon a locally optimized solution by repeatedly applying perturbations.
-
-First, the algorithm generates an initial solution and improves it using Local Search. It then applies a perturbation operator to change the current solution. Local Search is performed again on the perturbed solution.
-
-The perturbation helps the algorithm escape from the local optimum reached during the previous Local Search phase.
-
-The experiment evaluates several different perturbation operators. Each operator changes the solution in a different way.
-
-**Pseudocode:**
-
-```text
-ILS(number_of_iterations, perturbation, strength):
-
-    current = generate_random_solution()
-
-    current = local_search(current)
-
-    best = current
-
-    FOR i = 1 TO number_of_iterations:
-
-        candidate = perturb(current, perturbation, strength)
-
-        candidate = local_search(candidate)
-
-        IF candidate.cost < best.cost:
-
-            best = candidate
-
-        current = candidate
-
-    RETURN best
+```latex
+\begin{algorithm}
+\caption{Iterated local search}
+\begin{algorithmic}
+\STATE $P \gets \text{LS}(\text{random solution})$
+\STATE $\textit{runs} \gets 1$ \COMMENT{number of runs of the basic local search}
+\WHILE{the running time is below the average running time of MSLS}
+    \STATE $P' \gets \text{LS}(\text{Perturb}(P))$
+    \STATE $\textit{runs} \gets \textit{runs} + 1$
+    \IF{$f(P') < f(P)$}
+        \STATE $P \gets P'$
+    \ENDIF
+\ENDWHILE
+\RETURN $P$, $\textit{runs}$
+\end{algorithmic}
+\end{algorithm}
 ```
 
-The pseudocode describes the general ILS process. The exact acceptance rule for the current solution should follow the implementation in the ILS source file.
+Since only improving solutions are accepted, the current solution is always the best one found so far.
 
-### 2.4. Perturbation Strength
+### Perturbations
 
-The perturbation strength controls how many times a perturbation operation is applied during one ILS iteration.
+Eight perturbations were designed and compared. In the following, \(P = (p_0, \dots, p_{k-1})\) is the current cycle (\(k = 100\)), \(U = V \setminus P\) the set of unselected nodes, and all random choices are uniform. Each perturbation except ruin-recreate applies its basic operation **4 times** (perturbation strength 4), each time with new random choices. The objective value of the perturbed solution is computed from scratch.
 
-In the experiments, the configured parameter is
+**Double bridge.** Cuts the cycle at three random positions into four parts \(A\,B\,C\,D\) and reconnects them as \(A\,C\,B\,D\). Four edges are replaced, and the result cannot be undone by a single two-edge exchange. The selected nodes do not change.
 
-\[
-\text{strength}=4.
-\]
-
-For most perturbations, this means that the corresponding operation is executed four times before Local Search is started again.
-
-However, the exact effect of strength depends on the operator. For example, four node relocations move four individual nodes, whereas four segment relocations move four randomly selected blocks.
-
-**Ruin-Recreate is an exception:** its implementation calls the operation only once, regardless of the strength parameter. Instead, one call replaces approximately one eighth of the selected nodes.
-
-The following sections describe the operators and the exact meaning of strength in the supplied implementation.
-
-## 3. Perturbation Operators
-
-### 3.1. Double Bridge
-
-The Double Bridge operator performs a large modification of the cycle by cutting the route into several parts and reconnecting these parts in a different order.
-
-It is based on a 4-edge exchange and is designed to make a larger change than a simple edge exchange.
-
-The operator preserves the selected nodes but changes their order in the cycle.
-
-**Strength 4:** the implementation applies the Double Bridge operation four times during one perturbation phase.
-
-**Pseudocode:**
-
-```text
-DOUBLE_BRIDGE(solution):
-
-    divide the cycle into several sections
-
-    reconnect the sections in a different order
-
-    RETURN modified_solution
+```latex
+\begin{algorithm}
+\caption{Double bridge (one operation)}
+\begin{algorithmic}
+\STATE choose positions $0 < i < j < l < k$
+\STATE $A \gets (p_0, \dots, p_{i-1})$, $B \gets (p_i, \dots, p_{j-1})$, $C \gets (p_j, \dots, p_{l-1})$, $D \gets (p_l, \dots, p_{k-1})$
+\RETURN $A\,C\,B\,D$
+\end{algorithmic}
+\end{algorithm}
 ```
 
-### 3.2. Node Relocation
+**Node relocation.** Removes a random node from the cycle and inserts it at a random position.
 
-Node Relocation selects one node from the cycle, removes it from its current position and inserts it at another randomly selected position.
+**Segment shuffle.** Chooses a random segment \(p_i, \dots, p_j\) (\(0 \le i < j \le k - 1\), so its length ranges from 2 nodes to the whole cycle) and randomly reorders its nodes.
 
-The selected set remains unchanged. Only the order of nodes is modified.
+**Node exchange.** Replaces a random selected node with a random unselected node (the removed node becomes unselected).
 
-**Strength 4:** four individual node relocation operations are performed.
+**Segment relocation.** Removes a random segment of 2 to \(\lfloor k/3 \rfloor = 33\) consecutive nodes and inserts it, in the same order, at a random position of the remaining cycle.
 
-**Pseudocode:**
+**Segment exchange.** Swaps two random non-overlapping segments of equal length, 2 to \(\lfloor k/4 \rfloor = 25\) nodes; the order of nodes inside each segment is kept. The pair of segments is chosen uniformly among all such pairs.
 
-```text
-NODE_RELOCATION(solution):
+**Large 2-opt.** Reverses a random segment of 3 to \(k - 3\) consecutive nodes, i.e. a two-edge exchange of two random edges that are at least 3 nodes apart.
 
-    choose a random node position FROM
-
-    choose a random insertion position TO
-
-    remove the node at FROM
-
-    insert the node at TO
-
-    RETURN modified_solution
+```latex
+\begin{algorithm}
+\caption{various perturbations (one operation)}
+\begin{algorithmic}
+\STATE \textbf{node relocation:} choose $i$, $j$; move $p_i$ to position $j$
+\STATE \textbf{segment shuffle:} choose $i < j$; randomly permute $p_i, \dots, p_j$
+\STATE \textbf{node exchange:} choose $i$ and $u \in U$; $U \gets U \cup \{p_i\} \setminus \{u\}$; $p_i \gets u$
+\STATE \textbf{segment relocation:} choose $L \in [2, \lfloor k/3 \rfloor]$ and $i$; remove $S = (p_i, \dots, p_{i+L-1})$; insert $S$ at a random position of the rest
+\STATE \textbf{segment exchange:} choose $L \in [2, \lfloor k/4 \rfloor]$ and $i, j$ with $i + L \le j$, $j + L \le k$; swap $(p_i, \dots, p_{i+L-1})$ with $(p_j, \dots, p_{j+L-1})$
+\STATE \textbf{large 2-opt:} choose $L \in [3, k - 3]$ and $i$; reverse $(p_i, \dots, p_{i+L-1})$
+\end{algorithmic}
+\end{algorithm}
 ```
 
-### 3.3. Segment Shuffle
+**Ruin-recreate.** Applied once (not 4 times): replaces \(r = \max(2, \lfloor k/8 \rfloor) = 12\) selected nodes at distinct random positions with 12 distinct random unselected nodes. It changes the selected set much more than the other perturbations.
 
-Segment Shuffle selects a random contiguous segment of the cycle and randomly rearranges the nodes inside that segment.
-
-The segment is selected using two random positions. Its length can vary from two nodes up to the length of the cycle.
-
-The selected nodes remain the same, but their order inside the chosen segment changes.
-
-**Strength 4:** four segment-shuffling operations are performed. Each operation selects a new random segment.
-
-**Pseudocode:**
-
-```text
-SEGMENT_SHUFFLE(solution):
-
-    choose random segment boundaries i and j
-
-    randomly shuffle nodes between i and j
-
-    RETURN modified_solution
+```latex
+\begin{algorithm}
+\caption{Ruin-recreate}
+\begin{algorithmic}
+\STATE $r \gets \min(|U|, \max(2, \lfloor k/8 \rfloor))$
+\STATE choose $r$ distinct positions $i_1, \dots, i_r$ of $P$ and $r$ distinct nodes $u_1, \dots, u_r \in U$
+\FOR{$t = 1$ \TO $r$}
+    \STATE $U \gets U \cup \{p_{i_t}\} \setminus \{u_t\}$; $p_{i_t} \gets u_t$
+\ENDFOR
+\RETURN $P$
+\end{algorithmic}
+\end{algorithm}
 ```
 
-### 3.4. Node Exchange
+## Computational Experiment
 
-Node Exchange replaces one selected node with one currently unselected node.
+Each method (MSLS and ILS with each of the 8 perturbations) was run 20 times on each instance. One run of MSLS performs 400 runs of the basic local search. ILS starts each run from a new random solution and stops after the average running time of MSLS on the given instance. The results are compared with the best construction heuristics (Labs 1–2) and the best versions of the local search (Labs 3–5).
 
-The implementation randomly selects:
+All Lab 6 measurements were taken on one machine (Intel Core i7-12700, g++ 13.2 with `-O2`). After a few seconds of continuous load, the machine runs the experiment noticeably slower (a run of MSLS then takes up to almost 2 times longer). To make this affect both instances equally, the instances were run interleaved, run by run (as the methods in Lab 5): first MSLS on TSPA and TSPB alternately, then each ILS variant on TSPA and TSPB alternately.
 
-- a position in the current cycle,
-- a node from the unselected-node list.
+### Objective function values
 
-The selected node is exchanged with the unselected node. Therefore, unlike pure route-order perturbations, this operator changes the set of selected nodes.
-
-**Strength 4:** four node exchanges are attempted during one perturbation phase.
-
-**Pseudocode:**
-
-```text
-NODE_EXCHANGE(solution):
-
-    choose random selected node
-
-    choose random unselected node
-
-    replace selected node with unselected node
-
-    RETURN modified_solution
+```latex
+\begin{table}[H]
+\centering
+\small
+\caption{Objective function values}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{TSPA} & \multicolumn{3}{c}{TSPB} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+Method & avg & min & max & avg & min & max \\
+\midrule
+Greedy cycle & 73797.39 & 72590 & 75281 & 59709.47 & 53016 & 63736 \\
+Weighted 2-regret nearest neighbor & 75561.20 & 72419 & 78504 & 55698.34 & 50485 & 61406 \\
+Weighted 2-regret greedy cycle & 73348.72 & 72011 & 75532 & 57895.54 & 52731 & 63370 \\
+Greedy LS, edges, greedy cycle start & 73164.54 & 72088 & 74565 & 58728.54 & 51715 & 63178 \\
+Steepest LS, edges, random start, LM & 76191.55 & 73440 & 79726 & 52575.82 & 50091 & 54983 \\
+Steepest LS, edges, random start, candidates & 76255.74 & 74039 & 79511 & 52539.14 & 50382 & 55096 \\
+\midrule
+MSLS & 73638.00 & 72790 & 73966 & 50239.35 & 49600 & 50617 \\
+ILS, double bridge & \textbf{71618.75} & \textbf{71484} & 71850 & 48367.20 & 48151 & 49541 \\
+ILS, node relocation & 71657.50 & \textbf{71484} & 71977 & 48444.10 & 48165 & 48954 \\
+ILS, segment shuffle & 71866.60 & 71535 & 72354 & 48597.75 & 48328 & 48952 \\
+ILS, node exchange & 72175.70 & 71537 & 72894 & 48730.30 & 48265 & 49282 \\
+ILS, segment relocation & 71624.25 & \textbf{71484} & \textbf{71764} & \textbf{48335.55} & \textbf{48149} & 49818 \\
+ILS, segment exchange & 71645.75 & \textbf{71484} & 72036 & 48347.15 & 48150 & 48687 \\
+ILS, large 2-opt & 71756.40 & 71497 & 72011 & 48395.05 & 48175 & \textbf{48607} \\
+ILS, ruin-recreate & 71818.10 & 71503 & 72306 & 48461.55 & 48242 & 48956 \\
+\bottomrule
+\end{tabular}
+\end{table}
 ```
 
-### 3.5. Segment Relocation
+The best value of each ILS column is in bold.
 
-Segment Relocation removes a contiguous block of nodes from the cycle and inserts it at another randomly selected position.
+![Objective of each of the 20 runs (dots) and the average (line)](../../data/lab_6/plots/objective_runs.png)
 
-The relative order of nodes inside the moved block is preserved.
+**Every ILS variant is better than MSLS on both instances,** on average by 1462–2019 on TSPA and 1509–1904 on TSPB. Even the worst ILS runs are better than the best MSLS run in almost all cases (the exceptions are node exchange on TSPA and a single run of segment relocation on TSPB). With the same running time, improving one good solution step by step is much more effective than repeating the local search from random solutions, which always ends in local optima of similar, mediocre quality. ILS also beats all methods from the previous labs; MSLS is better than all of them on TSPB, but on TSPA its average is slightly worse than that of the weighted 2-regret greedy cycle heuristic and of the greedy local search starting from greedy cycle (73638.00 vs 73348.72 and 73164.54).
 
-In the supplied implementation, the segment length is selected randomly. For a cycle of 100 nodes, its length can range from 2 to 33 nodes.
+The best perturbations are **double bridge** (best average on TSPA), **segment relocation** (best average on TSPB, second on TSPA) and **segment exchange**; node relocation is close to them. They move whole parts of the cycle while keeping their internal order, a change that a single local search move cannot undo, so the local search does not just return to the previous local optimum. Four perturbations found the same best TSPA solution, 71484.
 
-**Strength 4:** four segment relocation operations are performed. Each operation selects a new block and insertion position.
+The weaker perturbations change the solution either too much or in a less useful way:
 
-**Pseudocode:**
+- **Segment shuffle** reorders a random segment of on average a third of the cycle, 4 times, which destroys a large part of the solution. The following local search is long (only about 1000 local search runs per ILS run) and ILS behaves similarly to a restart.
+- **Node exchange** changes only the selected set; it gives the worst averages of the ILS variants and the largest spread of results.
+- **Ruin-recreate** replaces 12 nodes with random unselected nodes, which are usually poor choices, and the local search spends much of its effort on repairing them; it lands in the middle of the ranking.
 
-```text
-SEGMENT_RELOCATION(solution):
+### Running time
 
-    choose random segment length
+Times are in microseconds (\(\mu s\)). For the Lab 1 and Lab 2 methods, only average times were recorded. The times of the previous methods are the ones reported in the previous labs.
 
-    choose random starting position
-
-    remove the selected segment
-
-    choose a new insertion position
-
-    insert the segment at the new position
-
-    RETURN modified_solution
+```latex
+\begin{table}[H]
+\centering
+\small
+\caption{Running time of a single run in $\mu s$}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{TSPA} & \multicolumn{3}{c}{TSPB} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+Method & avg & min & max & avg & min & max \\
+\midrule
+Greedy cycle & 525 & -- & -- & 520 & -- & -- \\
+Weighted 2-regret nearest neighbor & 940 & -- & -- & 960 & -- & -- \\
+Weighted 2-regret greedy cycle & 917 & -- & -- & 913 & -- & -- \\
+Greedy LS, edges, greedy cycle start & 814 & 684 & 1101 & 904 & 741 & 1555 \\
+Steepest LS, edges, random start, LM & 558 & 423 & 1064 & 530 & 418 & 809 \\
+Steepest LS, edges, random start, candidates & 814 & 638 & 2205 & 674 & 531 & 1216 \\
+\midrule
+MSLS & 223772 & 181596 & 314042 & 234374 & 176542 & 347854 \\
+ILS, double bridge & 223802 & 223772 & 223915 & 234392 & 234374 & 234456 \\
+ILS, node relocation & 223796 & 223772 & 223866 & 234389 & 234375 & 234417 \\
+ILS, segment shuffle & 223939 & 223778 & 224292 & 234647 & 234374 & 235673 \\
+ILS, node exchange & 223785 & 223772 & 223839 & 234383 & 234374 & 234399 \\
+ILS, segment relocation & 223798 & 223775 & 223862 & 234409 & 234379 & 234514 \\
+ILS, segment exchange & 223819 & 223776 & 223926 & 234404 & 234376 & 234561 \\
+ILS, large 2-opt & 223788 & 223772 & 223925 & 234394 & 234376 & 234459 \\
+ILS, ruin-recreate & 223815 & 223778 & 223955 & 234437 & 234378 & 234672 \\
+\bottomrule
+\end{tabular}
+\end{table}
 ```
 
-### 3.6. Segment Exchange
+One run of MSLS (400 local searches) takes about 180 ms on both instances when the machine is not slowed down (the minimum times are 182 ms on TSPA and 177 ms on TSPB), i.e. about 0.45 ms per local search. The averages, 224 ms on TSPA and 234 ms on TSPB, are higher because about half of the runs were slowed down by the machine (see above); thanks to interleaving, both instances are affected similarly. ILS stops after the average running time of MSLS; the measured times exceed it only by the time needed to finish the last local search (at most about 0.1%).
 
-Segment Exchange selects two non-overlapping blocks of equal length and swaps their positions in the cycle.
+### Number of runs of the basic local search in ILS
 
-The internal order of each block is preserved.
+The number of local search runs in one ILS run includes the initial local search and one local search after each perturbation.
 
-In the supplied implementation, the segment length is selected randomly. For a cycle of 100 nodes, it can range from 2 to 25 nodes.
-
-**Strength 4:** four segment exchanges are performed during one perturbation phase.
-
-**Pseudocode:**
-
-```text
-SEGMENT_EXCHANGE(solution):
-
-    choose a random segment length
-
-    choose two non-overlapping segment positions
-
-    swap the two segments
-
-    RETURN modified_solution
+```latex
+\begin{table}[H]
+\centering
+\small
+\caption{Number of runs of the basic local search in one run of ILS}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{TSPA} & \multicolumn{3}{c}{TSPB} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+Perturbation & avg & min & max & avg & min & max \\
+\midrule
+Double bridge & 6491.55 & 3959 & 7864 & 6650.45 & 4830 & 8163 \\
+Node relocation & 7488.35 & 4534 & 9282 & 7565.80 & 5131 & 9609 \\
+Segment shuffle & 1016.90 & 634 & 1313 & 1001.75 & 597 & 1247 \\
+Node exchange & 11054.15 & 9164 & 12769 & 11463.50 & 7608 & 14017 \\
+Segment relocation & 6240.65 & 5385 & 7315 & 6134.60 & 3929 & 7650 \\
+Segment exchange & 4610.15 & 2415 & 5823 & 5123.40 & 2909 & 6331 \\
+Large 2-opt & 11396.50 & 8933 & 13499 & 12490.60 & 9419 & 14914 \\
+Ruin-recreate & 3007.80 & 2016 & 3859 & 3421.25 & 2066 & 4160 \\
+\bottomrule
+\end{tabular}
+\end{table}
 ```
 
-### 3.7. Large 2-opt
+For comparison, MSLS performs 400 local search runs in the same time. ILS performs many more, since a local search started from a perturbed local optimum needs far fewer moves than one started from a random solution. The number depends on how much the perturbation changes: node exchange and large 2-opt allow about 11000–12500 local searches per run, segment shuffle only about 1000. A higher number does not automatically mean better results – node exchange has one of the highest numbers and the worst averages of the ILS variants. The wide min–max ranges are caused mainly by the slowdowns of the machine: a slowed-down run completes fewer local searches before the time limit.
 
-Large 2-opt reverses a randomly selected segment of the cycle.
+## Best Solutions
 
-Unlike a conventional short 2-opt modification, this operator can reverse a large part of the route.
+![Best solutions for TSPA](../../data/lab_6/plots/comparison_TSPA.png)
 
-The segment length is selected randomly and can range from 3 nodes to one less than the complete cycle length. The entire cycle is never reversed.
+![Best solutions for TSPB](../../data/lab_6/plots/comparison_TSPB.png)
 
-**Strength 4:** four large 2-opt operations are performed during one perturbation phase.
+### TSPA
 
-**Pseudocode:**
-
-```text
-LARGE_2OPT(solution):
-
-    choose random segment length
-
-    choose random starting position
-
-    reverse the selected segment
-
-    RETURN modified_solution
-```
-
-### 3.8. Ruin-Recreate
-
-Ruin-Recreate performs a stronger modification by replacing a group of selected nodes with currently unselected nodes.
-
-First, the algorithm chooses several distinct positions in the current cycle. It then replaces the nodes at those positions with randomly selected unselected nodes.
-
-This changes both the selected-node set and the resulting cycle.
-
-In the supplied implementation, the number of replacements is calculated as
-
-\[
-r = \min\left(
-|U|,
-\max\left(2,\left\lfloor\frac{m}{8}\right\rfloor\right)
-\right),
-\]
-
-where:
-
-- \(U\) is the set of currently unselected nodes,
-- \(m\) is the number of selected nodes in the cycle.
-
-For the two tested instances, \(m=100\). Therefore,
-
-\[
-r=\min(|U|,12).
-\]
-
-Assuming there are at least 12 unselected nodes, one Ruin-Recreate operation replaces exactly 12 selected nodes.
-
-**Strength 4:** in the current implementation, strength does not cause four Ruin-Recreate operations. The `apply()` function calls `ruin_recreate()` only once. The operation itself replaces approximately one eighth of the selected nodes.
-
-After the replacements, the implementation recalculates the complete objective value.
-
-**Pseudocode:**
+**MSLS:**
 
 ```text
-RUIN_RECREATE(solution):
-
-    determine number of nodes to replace
-
-    choose distinct positions in the cycle
-
-    FOR each chosen position:
-
-        choose a random unselected node
-
-        replace the selected node with the unselected node
-
-    recalculate the complete objective value
-
-    RETURN modified_solution
+176 174 150 106 89 42 151 182 57 64 107 88 78 193 153 75 170 146 159 130
+113 43 93 3 1 169 50 47 147 101 55 29 178 136 186 164 8 54 9 33
+131 36 177 52 179 53 140 144 67 16 51 139 112 5 115 157 91 71 4 76
+132 90 123 152 108 80 48 31 60 49 11 63 149 116 168 95 97 127 69 171
+2 187 30 141 87 28 180 156 35 185 45 73 135 181 192 158 58 84 134 72
 ```
 
-### 3.9. Summary of Perturbation Strength
+Total weight: **72790**
 
-The following table summarizes what `strength = 4` means in the supplied implementation.
-
-| Perturbation | Meaning of strength 4 |
-|---|---|
-| Double Bridge | Four Double Bridge operations |
-| Node Relocation | Four individual node relocations |
-| Segment Shuffle | Four segment shuffles |
-| Node Exchange | Four selected/unselected node exchanges |
-| Segment Relocation | Four segment relocations |
-| Segment Exchange | Four segment exchanges |
-| Large 2-opt | Four large segment reversals |
-| Ruin-Recreate | One operation, replacing approximately 12 nodes for a 100-node cycle |
-
-The number of nodes affected is not necessarily four. Strength counts operation calls for the first seven operators, while Ruin-Recreate uses its own replacement-count rule.
-
-## 4. Computational Experiment
-
-### 4.1. Experimental Setup
-
-The algorithms were tested on two instances: TSPA and TSPB.
-
-Both instances contain 200 nodes, and every feasible solution contains 100 selected nodes.
-
-The experiment compares:
-
-- MSLS,
-- ILS with Double Bridge,
-- ILS with Node Relocation,
-- ILS with Segment Shuffle,
-- ILS with Node Exchange,
-- ILS with Segment Relocation,
-- ILS with Segment Exchange,
-- ILS with Large 2-opt,
-- ILS with Ruin-Recreate.
-
-For all ILS perturbations, the configured strength is 4.
-
-Each method was executed 20 times. The results were evaluated using the best, maximum and average objective values, as well as execution times.
-
-### 4.2. Historical Objective Values from Previous Laboratories
-
-The following table contains the average, minimum and maximum objective values reported in Labs 1–5.
-
-| Method | TSPA average | TSPA min | TSPA max | TSPB average | TSPB min | TSPB max |
-|---|---:|---:|---:|---:|---:|---:|
-| Random | 263132.65 | 232767 | 290020 | 206682.99 | 185482 | 232014 |
-| Nearest neighbor (end) | 87476.63 | 84362 | 90075 | 59397.33 | 56007 | 63166 |
-| Nearest neighbor (any position) | 74346.96 | 72328 | 77022 | 59475.50 | 52915 | 66164 |
-| Greedy cycle | 73797.39 | 72590 | 75281 | 59709.47 | 53016 | 63736 |
-| 2-regret nearest neighbor | 122860.66 | 111527 | 133181 | 74763.39 | 69032 | 80767 |
-| 2-regret greedy cycle | 121007.17 | 112654 | 130924 | 73403.35 | 69455 | 78142 |
-| Weighted 2-regret nearest neighbor | 75561.20 | 72419 | 78504 | 55698.34 | 50485 | 61406 |
-| Weighted 2-regret greedy cycle | 73348.72 | 72011 | 75532 | 57895.54 | 52731 | 63370 |
-| Greedy LS, nodes, random start | 87875.52 | 80852 | 96854 | 63592.77 | 58487 | 70640 |
-| Greedy LS, nodes, greedy cycle start | 73478.34 | 72415 | 74736 | 59331.08 | 52707 | 63607 |
-| Greedy LS, edges, random start | 76342.58 | 74146 | 78532 | 52869.81 | 50667 | 55260 |
-| Greedy LS, edges, greedy cycle start | 73164.54 | 72088 | 74565 | 58728.54 | 51715 | 63178 |
-| Steepest LS, nodes, random start | 90293.09 | 83000 | 98690 | 65919.13 | 59827 | 74954 |
-| Steepest LS, nodes, greedy cycle start | 73468.17 | 72415 | 74736 | 59322.68 | 52588 | 63607 |
-| **Steepest LS, edges, random start (baseline)** | **76191.55** | **73440** | **79726** | **52575.82** | **50091** | **54983** |
-| Steepest LS, edges, greedy cycle start | 73167.85 | 72088 | 74544 | 58736.80 | 52523 | 63178 |
-| Steepest LS, edges, random start, candidates | 76255.74 | 74039 | 79511 | 52539.14 | 50382 | 55096 |
-| **Steepest LS, edges, random start, LM** | **76191.55** | **73440** | **79726** | **52575.82** | **50091** | **54983** |
-| **Steepest LS, edges, random start, LM + candidates** | **76241.80** | **73758** | **79511** | **52559.71** | **50382** | **55096** |
-
-### 4.3. Historical Running Times from Previous Laboratories
-
-The following table contains the historical running-time measurements. All values are in microseconds (\(\mu s\)).
-
-| Method | TSPA avg | TSPA min | TSPA max | TSPB avg | TSPB min | TSPB max |
-|---|---:|---:|---:|---:|---:|---:|
-| Random | 1 | -- | -- | 0 | -- | -- |
-| Nearest neighbor (end) | 36 | -- | -- | 25 | -- | -- |
-| Nearest neighbor (any position) | 612 | -- | -- | 576 | -- | -- |
-| Greedy cycle | 525 | -- | -- | 520 | -- | -- |
-| 2-regret nearest neighbor | 1034 | -- | -- | 1113 | -- | -- |
-| 2-regret greedy cycle | 873 | -- | -- | 890 | -- | -- |
-| Weighted 2-regret nearest neighbor | 940 | -- | -- | 960 | -- | -- |
-| Weighted 2-regret greedy cycle | 917 | -- | -- | 913 | -- | -- |
-| Greedy LS, nodes, random start | 725 | 469 | 1528 | 704 | 390 | 1337 |
-| Greedy LS, nodes, greedy cycle start | 799 | 670 | 1549 | 826 | 659 | 1391 |
-| Greedy LS, edges, random start | 467 | 344 | 813 | 478 | 342 | 1011 |
-| Greedy LS, edges, greedy cycle start | 814 | 684 | 1101 | 904 | 741 | 1555 |
-| Steepest LS, nodes, random start | 2769 | 2099 | 3842 | 2836 | 2139 | 6516 |
-| Steepest LS, nodes, greedy cycle start | 591 | 512 | 996 | 648 | 523 | 1153 |
-| **Steepest LS, edges, random start (baseline)** | **1692** | **1381** | **4189** | **1644** | **1324** | **2351** |
-| Steepest LS, edges, greedy cycle start | 574 | 498 | 1119 | 647 | 562 | 1043 |
-| Steepest LS, edges, random start, candidates | 814 | 638 | 2205 | 674 | 531 | 1216 |
-| **Steepest LS, edges, random start, LM** | **558** | **423** | **1064** | **530** | **418** | **809** |
-| **Steepest LS, edges, random start, LM + candidates** | **491** | **394** | **832** | **448** | **363** | **790** |
-
-### 4.4. Summary of Lab 6 Objective Values
-
-The following table presents the objective values obtained for TSPA and TSPB.
-
-The **Best** column contains the lowest objective value obtained across the runs. The **Max** column contains the highest objective value, and **Average** contains the arithmetic mean.
-
-| Instance | Method | Best | Max | Average |
-|---|---|---:|---:|---:|
-| TSPA | MSLS | 72790 | 73966 | 73638.00 |
-| TSPA | ILS_double_bridge_strength_4 | 71497 | 71884 | 71702.00 |
-| TSPA | ILS_node_relocation_strength_4 | 71500 | 71996 | 71669.25 |
-| TSPA | ILS_segment_shuffle_strength_4 | 71598 | 72279 | 71832.50 |
-| TSPA | ILS_node_exchange_strength_4 | 71590 | 72962 | 72237.85 |
-| TSPA | ILS_segment_relocation_strength_4 | 71484 | 71782 | 71629.00 |
-| TSPA | ILS_segment_exchange_strength_4 | 71497 | 72044 | 71668.85 |
-| TSPA | ILS_large_2opt_strength_4 | 71598 | 72434 | 71917.55 |
-| TSPA | ILS_ruin_recreate_strength_4 | 74667 | 78113 | 76307.10 |
-| TSPB | MSLS | 49600 | 50617 | 50239.35 |
-| TSPB | ILS_double_bridge_strength_4 | 48152 | 48885 | 48383.50 |
-| TSPB | ILS_node_relocation_strength_4 | 48165 | 48955 | 48455.30 |
-| TSPB | ILS_segment_shuffle_strength_4 | 48293 | 48952 | 48592.05 |
-| TSPB | ILS_node_exchange_strength_4 | 48325 | 49282 | 48791.90 |
-| TSPB | ILS_segment_relocation_strength_4 | 48149 | 49818 | 48342.85 |
-| TSPB | ILS_segment_exchange_strength_4 | 48167 | 48733 | 48374.85 |
-| TSPB | ILS_large_2opt_strength_4 | 48165 | 49016 | 48446.60 |
-| TSPB | ILS_ruin_recreate_strength_4 | 50757 | 56182 | 52589.95 |
-
-### 4.5. Comparison of Results
-
-For TSPA, the lowest average objective value was obtained by **ILS_segment_relocation_strength_4**, with an average of 71629.00 and a best result of 71484.
-
-The second-best average was obtained by **ILS_segment_exchange_strength_4**, with an average of 71668.85. **ILS_node_relocation_strength_4** achieved a very similar average of 71669.25.
-
-For TSPB, the best average was also obtained by **ILS_segment_relocation_strength_4**, with an average of 48342.85 and a best result of 48149.
-
-The second-best average was **ILS_segment_exchange_strength_4**, with 48374.85, followed closely by **ILS_double_bridge_strength_4**, with 48383.50.
-
-These results suggest that segment-based perturbations are particularly effective for the tested instances.
-
-MSLS performed worse than the ILS variants in terms of average objective value. This indicates that repeatedly perturbing and improving a solution can be more effective than relying only on independent random starting solutions.
-
-Ruin-Recreate produced the highest average objective values for both instances. Its stronger modifications may make it more difficult for the subsequent Local Search to recover a high-quality solution. Its performance suggests that the current replacement strategy may be too disruptive or insufficiently effective for these instances.
-
-### 4.6. Execution Times
-
-The following table presents the Lab 6 running times. All values are in microseconds (\(\mu s\)).
-
-| Instance | Method | Average time (\(\mu s\)) | Minimum time (\(\mu s\)) | Maximum time (\(\mu s\)) |
-|---|---|---:|---:|---:|
-| TSPA | MSLS | 215254.95 | 207998 | 236942 |
-| TSPA | ILS_double_bridge_strength_4 | 215296.00 | 215254 | 215615 |
-| TSPA | ILS_node_relocation_strength_4 | 215274.20 | 215255 | 215289 |
-| TSPA | ILS_segment_shuffle_strength_4 | 215378.45 | 215274 | 215533 |
-| TSPA | ILS_node_exchange_strength_4 | 215272.05 | 215254 | 215341 |
-| TSPA | ILS_segment_relocation_strength_4 | 215284.75 | 215258 | 215347 |
-| TSPA | ILS_segment_exchange_strength_4 | 215290.90 | 215255 | 215319 |
-| TSPA | ILS_large_2opt_strength_4 | 215268.80 | 215255 | 215288 |
-| TSPA | ILS_ruin_recreate_strength_4 | 215293.70 | 215254 | 215391 |
-| TSPB | MSLS | 221030.95 | 206696 | 250372 |
-| TSPB | ILS_double_bridge_strength_4 | 221055.05 | 221030 | 221076 |
-| TSPB | ILS_node_relocation_strength_4 | 221051.15 | 221033 | 221074 |
-| TSPB | ILS_segment_shuffle_strength_4 | 221133.70 | 221031 | 221314 |
-| TSPB | ILS_node_exchange_strength_4 | 221048.00 | 221032 | 221096 |
-| TSPB | ILS_segment_relocation_strength_4 | 221055.40 | 221031 | 221076 |
-| TSPB | ILS_segment_exchange_strength_4 | 221062.55 | 221032 | 221091 |
-| TSPB | ILS_large_2opt_strength_4 | 221047.00 | 221033 | 221067 |
-| TSPB | ILS_ruin_recreate_strength_4 | 221062.15 | 221038 | 221100 |
-
-The execution times are very similar for all ILS variants.
-
-For TSPA, the average times are approximately 215 milliseconds. For TSPB, they are approximately 221 milliseconds.
-
-This means that the differences in solution quality are not accompanied by substantial differences in execution time. Consequently, the choice of perturbation operator has a greater influence on the objective value than on the measured runtime in these experiments.
-
-### 4.7. Local Search Statistics
-
-The following table presents the Local Search statistics recorded by the implementation.
-
-| Instance | Perturbation | Strength | Average LS runs | Min LS runs | Max LS runs |
-|---|---|---:|---:|---:|---:|
-| TSPA | double_bridge | 4 | 4254.95 | 3689 | 4585 |
-| TSPA | node_relocation | 4 | 5453.95 | 5185 | 5637 |
-| TSPA | segment_shuffle | 4 | 1083.65 | 985 | 1153 |
-| TSPA | node_exchange | 4 | 6854.65 | 6315 | 7260 |
-| TSPA | segment_relocation | 4 | 4573.05 | 4258 | 4730 |
-| TSPA | segment_exchange | 4 | 3033.50 | 2831 | 3176 |
-| TSPA | large_2opt | 4 | 6678.35 | 6267 | 6985 |
-| TSPA | ruin_recreate | 4 | 2865.10 | 2782 | 2994 |
-| TSPB | double_bridge | 4 | 4303.90 | 3856 | 4629 |
-| TSPB | node_relocation | 4 | 5525.65 | 5209 | 5836 |
-| TSPB | segment_shuffle | 4 | 1069.75 | 990 | 1167 |
-| TSPB | node_exchange | 4 | 7503.70 | 7096 | 7629 |
-| TSPB | segment_relocation | 4 | 4802.85 | 4505 | 4973 |
-| TSPB | segment_exchange | 4 | 3305.25 | 3195 | 3489 |
-| TSPB | large_2opt | 4 | 7256.55 | 6510 | 7487 |
-| TSPB | ruin_recreate | 4 | 3052.15 | 2776 | 3257 |
-
-The recorded values vary considerably between perturbation operators.
-
-Segment Shuffle has the lowest average recorded LS count for both instances. Node Exchange and Large 2-opt have among the highest counts.
-
-This indicates that the different perturbations lead to different amounts of recorded Local Search work. However, a lower LS count does not automatically mean a better solution. The objective values must also be considered when evaluating an operator.
-
-The exact interpretation of the LS counter should follow the counter's definition in the source code; the table preserves the name and values reported by the experiment.
-
-## 5. Solution Visualizations
-
-### 5.1. TSPA – Comparison of Methods
-![alt text](image-4.png)
-
-### 5.2. TSPB – Comparison of Methods
-![alt text](image-3.png)
-
-## 6. Best Solutions
-
-The following examples contain the solution paths and their objective values supplied by the experiment.
-
-Each path represents a cycle through 100 selected nodes. The examples are identified by their objective values and the corresponding method names.
-
-### 6.1. TSPA
-
-**Example 1 – ILS_segment_exchange_strength_4**
-
-Objective value: **71497**
+**ILS, double bridge:**
 
 ```text
-30 187 189 2 171 104 129 69 127 97 168 116 149 63 11 49 160 83 123 100 152 108 60 31 48 80 91 157 71 4 76 132 180 28 102 185 35 51 16 67 144 140 53 179 52 177 36 131 33 9 54 8 174 85 93 50 3 169 1 164 186 136 184 178 29 101 147 47 130 159 146 170 153 193 78 88 107 64 57 182 151 42 89 113 106 150 176 72 134 84 58 158 192 181 114 135 73 45 87 141
+108 49 168 63 149 116 60 31 48 80 91 157 71 4 76 132 180 28 156 35
+51 16 67 144 140 53 179 52 177 36 131 33 9 54 8 174 85 93 50 3
+169 1 164 186 136 184 178 29 101 147 47 130 159 146 170 153 193 78 88 107
+64 57 182 151 42 89 113 106 150 176 72 134 84 58 158 192 181 114 135 73
+45 185 102 87 141 30 187 189 2 171 104 129 69 127 97 160 83 123 100 152
 ```
 
-**Example 2 – ILS_large_2opt_strength_4**
+Total weight: **71484**
 
-Objective value: **71598**
+**ILS, node relocation:**
 
 ```text
-170 146 159 130 47 147 101 29 178 184 136 186 164 142 8 54 9 33 131 36 177 52 179 53 140 144 67 16 51 35 156 28 180 132 76 4 71 157 91 80 48 31 60 108 152 100 123 83 160 49 11 63 149 116 168 97 127 69 171 2 189 187 30 141 87 102 185 45 73 135 114 181 192 158 58 84 134 72 176 174 85 1 169 3 50 93 113 89 42 106 150 151 182 57 64 107 88 78 193 153
+102 87 141 30 187 189 2 171 104 129 69 127 97 160 83 123 100 152 108 49
+168 63 149 116 60 31 48 80 91 157 71 4 76 132 180 28 156 35 51 16
+67 144 140 53 179 52 177 36 131 33 9 54 8 174 85 93 50 3 169 1
+164 186 136 184 178 29 101 147 47 130 159 146 170 153 193 78 88 107 64 57
+182 151 42 89 113 106 150 176 72 134 84 58 158 192 181 114 135 73 45 185
 ```
 
-**Example 3 – ILS_node_exchange_strength_4**
+Total weight: **71484**
 
-Objective value: **71590**
+**ILS, segment shuffle:**
 
 ```text
-91 80 48 31 60 108 152 100 123 83 160 49 63 149 116 168 95 97 127 69 129 104 171 2 189 187 30 141 87 45 73 135 114 181 192 158 58 84 134 72 176 150 106 113 89 42 151 182 57 64 107 88 78 193 153 170 146 159 130 47 93 50 3 169 1 101 29 178 184 136 186 164 85 174 8 54 9 33 131 36 177 52 179 53 140 144 67 16 51 156 35 185 102 28 180 132 76 4 71 157
+49 11 168 63 149 116 60 31 48 80 91 157 71 4 76 132 180 28 102 185
+35 156 51 16 67 144 140 53 179 52 177 36 131 33 9 54 8 142 164 186
+136 184 178 29 101 1 169 3 50 93 47 130 159 146 170 153 193 78 88 107
+64 57 182 151 42 89 113 106 150 174 176 72 134 84 58 158 192 181 114 135
+73 45 87 141 30 187 189 2 171 104 129 69 127 97 160 83 123 100 152 108
 ```
 
-**Example 4 – ILS_node_relocation_strength_4**
+Total weight: **71535**
 
-Objective value: **71500**
+**ILS, node exchange:**
 
 ```text
-108 152 100 123 83 160 97 127 69 129 104 171 2 189 187 30 141 87 45 73 135 114 181 192 158 58 84 134 72 176 174 85 1 169 3 50 93 113 89 42 106 150 151 182 57 64 107 88 78 193 153 170 146 159 130 47 147 101 29 178 184 136 186 164 8 54 9 33 131 36 177 52 179 53 140 144 67 16 51 156 35 185 102 28 180 132 76 4 71 157 91 80 48 31 60 116 149 63 168 49
+91 80 48 31 60 108 152 100 123 83 160 49 11 63 149 116 168 97 127 69
+129 104 171 2 189 187 30 141 87 45 73 135 114 181 192 158 58 84 134 72
+176 150 106 113 89 42 151 182 57 64 107 88 78 193 153 170 146 159 130 47
+93 50 3 169 1 101 29 178 184 136 186 164 85 174 8 54 9 33 131 36
+177 52 179 53 140 144 67 16 51 156 35 185 102 28 180 132 76 4 71 157
 ```
 
-**Example 5 – ILS_ruin_recreate_strength_4**
+Total weight: **71537**
 
-Objective value: **74667**
+**ILS, segment relocation:**
 
 ```text
-123 83 148 90 100 152 108 49 11 119 168 63 149 116 60 31 48 80 38 91 157 71 132 76 4 139 51 16 35 67 144 140 53 179 52 177 36 131 33 9 54 174 176 150 106 93 50 169 1 3 85 164 178 184 136 163 29 17 55 101 147 37 47 159 170 153 78 88 107 130 113 89 42 151 57 182 158 134 84 58 181 114 25 135 73 45 185 102 28 180 87 141 30 187 189 2 171 127 97 160
+52 179 53 140 144 67 16 51 35 156 28 180 132 76 4 71 157 91 80 48
+31 60 116 149 63 168 49 108 152 100 123 83 160 97 127 69 129 104 171 2
+189 187 30 141 87 102 185 45 73 135 114 181 192 158 58 84 134 72 176 150
+106 113 89 42 151 182 57 64 107 88 78 193 153 170 146 159 130 47 147 101
+29 178 184 136 186 164 1 169 3 50 93 85 174 8 54 9 33 131 36 177
 ```
 
-**Example 6 – ILS_double_bridge_strength_4**
+Total weight: **71484**
 
-Objective value: **71497**
+**ILS, segment exchange:**
 
 ```text
-53 140 144 67 16 51 35 185 102 28 180 132 76 4 71 157 91 80 48 31 60 108 152 100 123 83 160 49 11 63 149 116 168 97 127 69 129 104 171 2 189 187 30 141 87 45 73 135 114 181 192 158 58 84 134 72 176 150 106 113 89 42 151 182 57 64 107 88 78 193 153 170 146 159 130 47 147 101 29 178 184 136 186 164 1 169 3 50 93 85 174 8 54 9 33 131 36 177 52 179
+144 67 16 51 156 35 185 102 28 180 132 76 4 71 157 91 80 48 31 60
+116 149 63 168 49 108 152 100 123 83 160 97 127 69 129 104 171 2 189 187
+30 141 87 45 73 135 114 181 192 158 58 84 134 72 176 150 106 113 89 42
+151 182 57 64 107 88 78 193 153 170 146 159 130 47 147 101 29 178 184 136
+186 164 1 169 3 50 93 85 174 8 54 9 33 131 36 177 52 179 53 140
 ```
 
-**Example 7 – ILS_segment_relocation_strength_4**
+Total weight: **71484**
 
-Objective value: **71484**
+**ILS, large 2-opt:**
 
 ```text
-52 179 53 140 144 67 16 51 35 156 28 180 132 76 4 71 157 91 80 48 31 60 116 149 63 168 49 108 152 100 123 83 160 97 127 69 129 104 171 2 189 187 30 141 87 102 185 45 73 135 114 181 192 158 58 84 134 72 176 150 106 113 89 42 151 182 57 64 107 88 78 193 153 170 146 159 130 47 147 101 29 178 184 136 186 164 1 169 3 50 93 85 174 8 54 9 33 131 36 177
+88 107 64 57 182 151 42 89 113 106 150 176 72 134 84 58 158 192 181 114
+135 73 45 87 141 30 187 189 2 171 104 129 69 127 97 168 116 149 63 11
+49 160 83 123 100 152 108 60 31 48 80 91 157 71 4 76 132 180 28 102
+185 35 51 16 67 144 140 53 179 52 177 36 131 33 9 54 8 174 85 93
+50 3 169 1 164 186 136 184 178 29 101 147 47 130 159 146 170 153 193 78
 ```
 
-**Example 8 – ILS_segment_shuffle_strength_4**
+Total weight: **71497**
 
-Objective value: **71598**
+**ILS, ruin-recreate:**
 
 ```text
-67 144 140 53 179 52 177 36 131 33 9 54 8 174 85 93 50 3 169 1 164 186 136 178 29 101 147 37 47 130 159 146 170 153 193 78 88 107 64 57 182 151 42 89 113 106 150 176 72 134 84 58 158 192 181 114 135 73 45 185 102 87 141 30 187 189 2 171 104 129 69 127 97 160 83 123 100 152 108 49 168 63 149 116 60 31 48 80 91 157 71 4 76 132 180 28 156 35 51 16
+45 73 135 114 181 192 158 58 84 134 72 176 150 106 113 89 42 151 182 57
+64 107 88 78 193 153 170 146 159 130 47 147 101 29 178 184 136 186 164 1
+169 3 50 93 85 174 8 54 9 33 131 36 177 52 179 53 140 144 67 16
+51 156 35 185 102 28 180 132 76 4 71 157 91 80 48 31 60 108 152 100
+123 83 160 49 63 149 116 168 97 127 69 129 104 171 2 189 187 30 141 87
 ```
 
-**Example 9 – MSLS**
+Total weight: **71503**
 
-Objective value: **72790**
+### TSPB
+
+**MSLS:**
 
 ```text
-176 174 150 106 89 42 151 182 57 64 107 88 78 193 153 75 170 146 159 130 113 43 93 3 1 169 50 47 147 101 55 29 178 136 186 164 8 54 9 33 131 36 177 52 179 53 140 144 67 16 51 139 112 5 115 157 91 71 4 76 132 90 123 152 108 80 48 31 60 49 11 63 149 116 168 95 97 127 69 171 2 187 30 141 87 28 180 156 35 185 45 73 135 181 192 158 58 84 134 72
+80 153 14 2 20 74 17 171 99 88 179 87 82 51 85 59 73 167 181 152
+67 24 34 98 151 3 184 86 46 72 120 133 136 172 160 69 183 30 21 38
+154 140 47 64 33 40 71 60 157 45 134 175 36 197 132 29 6 180 115 170
+97 26 125 177 138 158 145 28 149 116 147 121 198 96 48 89 57 185 135 76
+104 162 192 54 18 187 70 190 81 94 105 61 139 196 114 148 10 90 129 127
 ```
 
-### 6.2. TSPB
+Total weight: **49600**
 
-**Example 1 – ILS_double_bridge_strength_4**
-
-Objective value: **48152**
+**ILS, double bridge:**
 
 ```text
-38 47 140 154 26 125 177 170 115 155 71 40 60 157 45 134 175 36 197 6 29 132 103 178 65 145 28 149 13 146 37 116 147 42 121 198 96 48 89 57 185 76 162 192 54 187 70 190 81 94 105 61 196 114 10 127 80 129 90 153 14 2 20 74 17 171 99 88 179 87 82 51 85 59 73 167 181 152 34 24 67 66 27 151 3 184 86 46 72 117 8 120 133 136 172 160 69 183 30 21
+60 157 45 134 175 62 36 197 6 29 132 103 178 65 145 28 149 13 146 37
+116 147 42 121 198 96 48 89 57 185 76 162 192 54 187 70 190 81 94 105
+61 196 114 10 127 80 129 90 153 14 2 20 74 17 171 99 88 179 87 82
+51 85 59 73 167 181 152 34 24 67 66 27 151 3 184 46 72 117 8 120
+133 136 172 160 69 183 30 21 38 47 140 154 26 125 177 170 115 155 71 40
 ```
 
-**Example 2 – ILS_large_2opt_strength_4**
+Total weight: **48151**
 
-Objective value: **48165**
+**ILS, node relocation:**
 
 ```text
-46 72 117 8 120 133 136 172 160 69 183 30 21 38 47 140 154 97 155 71 40 60 157 45 134 175 36 197 132 29 6 115 170 125 177 158 145 28 149 13 146 37 116 147 42 121 198 96 48 89 57 185 76 104 190 70 187 81 94 105 61 196 114 10 78 54 162 192 80 127 129 90 153 14 2 20 74 17 171 99 88 179 87 82 51 85 59 73 167 181 152 34 24 67 66 27 151 3 184 86
+147 116 37 146 13 149 28 145 158 177 125 170 115 6 29 132 197 36 175 134
+45 157 60 40 71 155 97 154 140 47 38 21 30 183 69 160 172 136 133 120
+8 117 72 46 86 184 3 151 27 66 67 24 34 152 181 167 73 59 85 51
+82 87 179 88 99 171 17 74 20 2 14 153 90 129 127 80 192 162 54 78
+10 114 196 61 105 94 81 187 70 190 104 76 185 57 89 48 96 198 121 42
 ```
 
-**Example 3 – ILS_node_exchange_strength_4**
+Total weight: **48165**
 
-Objective value: **48325**
+**ILS, segment shuffle:**
 
 ```text
-125 177 170 115 180 6 29 132 197 36 175 134 45 157 60 40 141 71 155 97 154 140 47 38 21 30 183 189 69 160 172 136 133 120 8 117 72 46 184 3 151 27 76 66 67 24 34 152 181 167 73 59 85 51 82 87 179 88 99 171 17 74 20 2 14 153 90 129 127 80 192 162 54 78 10 114 196 61 105 94 81 187 70 190 57 89 48 96 198 121 147 116 37 146 13 149 28 145 158 26
+30 183 189 168 69 160 172 136 133 120 8 117 72 46 184 3 151 98 34 24
+67 152 181 167 73 59 85 51 82 87 179 88 99 171 17 74 20 2 14 153
+182 52 80 127 129 90 10 114 196 61 105 94 81 190 70 187 54 192 162 76
+185 57 89 48 96 198 121 147 116 37 146 13 149 28 145 158 177 125 170 115
+180 6 29 132 197 36 175 134 45 157 60 40 71 155 97 154 140 47 38 21
 ```
 
-**Example 4 – ILS_node_relocation_strength_4**
+Total weight: **48328**
 
-Objective value: **48165**
+**ILS, node exchange:**
 
 ```text
-147 116 37 146 13 149 28 145 158 177 125 170 115 6 29 132 197 36 175 134 45 157 60 40 71 155 97 154 140 47 38 21 30 183 69 160 172 136 133 120 8 117 72 46 86 184 3 151 27 66 67 24 34 152 181 167 73 59 85 51 82 87 179 88 99 171 17 74 20 2 14 153 90 129 127 80 192 162 54 78 10 114 196 61 105 94 81 187 70 190 104 76 185 57 89 48 96 198 121 42
+57 185 76 104 190 70 81 94 105 61 196 114 10 54 162 192 80 127 129 90
+153 14 2 20 74 171 99 88 179 87 82 51 85 59 73 167 181 152 67 24
+34 98 151 3 184 86 46 72 117 8 120 133 136 172 160 69 189 183 30 21
+38 47 140 154 26 125 177 170 115 155 71 40 60 157 45 134 175 62 36 197
+6 29 132 103 178 65 145 28 149 13 146 37 116 147 42 121 198 96 48 89
 ```
 
-**Example 5 – ILS_ruin_recreate_strength_4**
+Total weight: **48265**
 
-Objective value: **50757**
+**ILS, segment relocation:**
 
 ```text
-85 107 59 51 167 73 151 122 173 3 184 137 117 8 120 133 136 172 160 69 21 38 47 140 154 26 97 155 71 40 60 157 45 134 175 36 197 132 29 6 115 170 125 177 138 158 65 145 28 149 13 146 37 116 147 42 121 198 58 96 48 43 156 89 72 46 86 135 76 185 57 190 94 105 81 196 114 10 54 192 80 127 129 90 153 14 2 20 74 171 99 67 66 24 34 152 181 179 87 82
+85 51 82 87 179 88 99 171 17 74 20 2 14 153 182 80 127 129 90 10
+114 196 61 105 94 81 190 70 187 54 192 162 76 185 57 89 48 96 198 121
+42 147 116 37 146 13 149 28 145 65 178 103 132 29 6 197 36 175 134 45
+157 60 40 71 155 115 170 177 125 26 154 140 47 38 21 30 183 69 160 172
+136 133 120 8 117 72 46 184 3 151 27 66 67 24 34 152 181 167 73 59
 ```
 
-**Example 6 – ILS_segment_exchange_strength_4**
+Total weight: **48149**
 
-Objective value: **48167**
+**ILS, segment exchange:**
 
 ```text
-61 105 94 81 187 70 190 57 89 48 96 198 121 42 147 116 37 146 13 149 28 145 65 178 103 132 29 6 197 36 175 134 45 157 60 40 71 155 115 170 177 125 26 154 140 47 38 21 30 183 69 160 172 136 133 120 8 117 72 46 86 184 3 151 27 76 66 67 24 34 152 181 167 73 59 85 51 82 87 179 88 99 171 17 74 20 2 14 153 90 129 127 80 192 162 54 78 10 114 196
+114 196 61 105 94 81 187 70 190 104 76 185 57 89 48 96 198 121 42 147
+116 37 146 13 149 28 145 158 177 125 170 115 180 6 29 132 197 36 175 134
+45 157 60 40 71 155 97 154 140 47 38 21 30 183 69 160 172 136 133 120
+8 117 72 46 184 3 151 27 66 67 24 34 152 181 167 73 59 85 51 82
+87 179 88 99 171 17 74 20 2 14 153 90 129 127 80 192 162 54 78 10
 ```
 
-**Example 7 – ILS_segment_relocation_strength_4**
+Total weight: **48150**
 
-Objective value: **48149**
+**ILS, large 2-opt:**
 
 ```text
-85 51 82 87 179 88 99 171 17 74 20 2 14 153 182 80 127 129 90 10 114 196 61 105 94 81 190 70 187 54 192 162 76 185 57 89 48 96 198 121 42 147 116 37 146 13 149 28 145 65 178 103 132 29 6 197 36 175 134 45 157 60 40 71 155 115 170 177 125 26 154 140 47 38 21 30 183 69 160 172 136 133 120 8 117 72 46 184 3 151 27 66 67 24 34 152 181 167 73 59
+10 114 196 61 105 94 81 190 70 187 54 192 162 76 185 57 89 48 96 198
+121 42 147 116 37 146 13 149 28 145 158 177 125 170 115 180 6 29 132 197
+36 175 134 45 157 60 40 71 155 97 154 140 47 38 21 30 183 69 160 172
+136 133 120 8 117 72 46 86 184 3 151 27 66 67 24 34 152 181 167 73
+59 85 51 82 87 179 88 99 171 17 74 20 2 14 153 182 80 127 129 90
 ```
 
-**Example 8 – ILS_segment_shuffle_strength_4**
+Total weight: **48175**
 
-Objective value: **48293**
+**ILS, ruin-recreate:**
 
 ```text
-180 6 29 132 197 36 175 134 45 157 60 40 71 155 97 154 140 47 38 21 30 191 130 183 189 69 160 172 136 133 120 8 117 72 46 86 184 3 151 98 167 73 59 85 51 82 87 179 181 152 34 24 67 99 171 17 74 20 2 14 153 182 80 127 129 90 10 114 196 61 105 94 81 190 70 187 54 192 162 76 185 57 89 48 96 198 121 147 116 37 146 13 149 28 145 158 177 125 170 115
+51 82 87 179 181 152 34 24 67 99 171 17 74 20 2 14 153 90 129 127
+80 192 162 54 78 10 114 196 61 105 94 81 187 70 190 104 76 185 57 89
+48 96 198 121 42 147 116 37 146 13 149 28 145 158 177 125 170 115 6 29
+132 197 36 175 134 45 157 60 40 71 155 97 154 140 47 38 21 30 191 130
+183 69 160 172 136 133 120 8 117 72 46 86 184 3 151 98 167 73 59 85
 ```
 
-**Example 9 – MSLS**
+Total weight: **48242**
 
-Objective value: **49600**
+## Solution Checker
 
-```text
-80 153 14 2 20 74 17 171 99 88 179 87 82 51 85 59 73 167 181 152 67 24 34 98 151 3 184 86 46 72 120 133 136 172 160 69 183 30 21 38 154 140 47 64 33 40 71 60 157 45 134 175 36 197 132 29 6 180 115 170 97 26 125 177 138 158 145 28 149 116 147 121 198 96 48 89 57 185 135 76 104 162 192 54 18 187 70 190 81 94 105 61 139 196 114 148 10 90 129 127
-```
+Every generated solution was verified using the solution checker: `src/utils/checker/solution_checker.hpp`.
 
-## 7. Solution Validation
+The checker recalculates the objective function using the distance matrix and node costs. It also verifies that each solution contains exactly \(\lceil n/2\rceil\) nodes, that all node indices are valid, and that no node occurs more than once. The objective value calculated by the checker is compared with the value reported by the algorithm.
 
-The solutions were checked using the solution checker provided with the assignment.
+All generated solutions (the results of all 20 runs per instance and method) passed these checks. The best solutions can additionally be verified using the checker provided on ekursy.
 
-The checker verifies that:
+## Conclusions
 
-- Each solution contains exactly 100 selected nodes.
-- Every node identifier is valid for the corresponding instance.
-- No selected node appears more than once.
-- The solution forms a valid cycle.
-- The objective value calculated by the checker agrees with the objective value reported by the algorithm.
+- **ILS is clearly better than MSLS with the same running time.** For every perturbation, ILS obtained a lower average objective than MSLS on both instances; the best variants are 2.7% better on TSPA (71618.75 vs 73638.00) and 3.8% better on TSPB (48335.55 vs 50239.35).
 
-## 8. Conclusions
+- **ILS gives the best solutions so far.** The best ILS solutions (71484 for TSPA, 48149 for TSPB) are better than the best solutions of all methods from the previous labs (72011 and 50091).
 
-The experiments demonstrate that the choice of perturbation operator has a significant influence on the performance of Iterated Local Search.
+- **The best perturbations move whole parts of the cycle.** Double bridge, segment relocation and segment exchange give the best results: they keep most of the structure of the current solution, but make a change that a single local search move cannot undo.
 
-For both TSPA and TSPB, **ILS_segment_relocation_strength_4** achieved the lowest average objective value.
+- **Too destructive or too narrow perturbations are worse.** Segment shuffle destroys a large part of the cycle, so ILS performs only about 1000 local searches per run; node exchange only changes the selected set and gives the worst averages among the ILS variants.
 
-For TSPA, it obtained an average objective value of 71629.00 and the best result of 71484.
+- **ILS performs many more local searches than MSLS in the same time** (about 1000–12500 instead of 400), since a local search started from a perturbed local optimum is much shorter than one started from a random solution.
 
-For TSPB, it obtained an average objective value of 48342.85 and the best result of 48149.
+## Source Code
 
-Segment Exchange and Double Bridge also produced competitive results. Their average objective values were close to those of Segment Relocation, especially on TSPB.
-
-Node Relocation performed well on TSPA, while Segment Shuffle was less competitive in terms of objective quality despite having the lowest recorded Local Search count.
-
-Ruin-Recreate produced significantly worse results than the other methods. Its average objective value was even worse than MSLS on both instances. This suggests that replacing a large number of nodes at once may be too disruptive for the current implementation.
-
-The execution times of all ILS variants were very similar. Therefore, the observed differences in solution quality are mainly associated with the perturbation strategies rather than substantial runtime differences.
-
-Overall, the results indicate that moderate structural changes, particularly Segment Relocation and Segment Exchange, are effective ways of escaping local optima while preserving enough of the existing solution structure for Local Search to improve it.
-
-## 9. Source Code
-
-The implementation of Lab 6 is available in the project repository:
+The implementation is available in the repository:
 
 [EC_Assignments – Lab 6](https://github.com/Igor-S-666/EC_Assignments/tree/main/src/lab_6)
 
-The implementation includes the Local Search algorithm, MSLS, ILS, perturbation operators, experiment execution and result visualization utilities.
+MSLS is implemented in `msls.hpp`, ILS in `ils.hpp` and the perturbations in `perturbations.hpp`. The steepest local search with the list of improving moves (from Lab 5) is in `local_steepest_fast.hpp`.
