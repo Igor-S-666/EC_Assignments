@@ -1,4 +1,3 @@
-
 /**
  * @file ils.hpp
  * @brief Iterated Local Search.
@@ -24,8 +23,13 @@ struct ils_result {
 class ILS {
 public:
 
-    explicit ILS(LocalSearchSteepestFast& local_search)
-        : local_search(local_search) {}
+    /**
+     * @param reuse_memory if true, the local search after a perturbation starts from the final LM of the current
+     *  solution and evaluates only the moves the perturbation could have made improving (same local optimum as a
+     *  full search, much faster). If false, every local search evaluates all moves of the perturbed solution.
+     */
+    explicit ILS(LocalSearchSteepestFast& local_search, bool reuse_memory = true)
+        : local_search(local_search), reuse_memory(reuse_memory) {}
 
     /**
      * @brief Runs Iterated Local Search.
@@ -49,8 +53,10 @@ public:
 
         const auto start = clock_type::now();
 
+        // final LMs of the current solution and of the last candidate
+        LocalSearchSteepestFast::Memory current_memory, candidate_memory;
 
-        algorithm_result current = local_search.run(data);
+        algorithm_result current = local_search.run_random(data, &current_memory);
 
         algorithm_result best = current;
 
@@ -68,10 +74,9 @@ public:
             );
 
             // Run local search from the perturbed solution.
-            candidate = local_search.run_from_solution(
-                data,
-                candidate
-            );
+            candidate = reuse_memory
+                ? local_search.run_from_perturbation(data, candidate, current, current_memory, &candidate_memory)
+                : local_search.run_from_solution(data, candidate);
 
             ++local_search_runs;
 
@@ -84,6 +89,7 @@ public:
             // The problem is a minimization problem.
             if (candidate.total_weight < current.total_weight) {
                 current = std::move(candidate);
+                std::swap(current_memory, candidate_memory);
             }
         }
 
@@ -101,4 +107,5 @@ public:
 
 private:
     LocalSearchSteepestFast& local_search;
+    bool reuse_memory;
 };

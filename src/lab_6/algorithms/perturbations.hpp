@@ -1,22 +1,24 @@
 /**
  * @file perturbations.hpp
  * @brief Perturbation operators for ILS, including large-scale moves.
+ *
+ * Every operator works in place on the cycle (a plain vector of node ids). The objective of the result is
+ * recomputed once at the end, which costs O(m) - negligible next to the local search that follows - and can't drift
+ * the way accumulated deltas can.
  */
 
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "../../types.hpp"
-#include "../../utils/neighbour_utils/types.hpp"
-#include "../../utils/neighbour_utils/neighbour_exchanges.hpp"
 
 enum class PerturbationType {
-    MULTI_2OPT,
     DOUBLE_BRIDGE,
     NODE_RELOCATION,
     SEGMENT_SHUFFLE,
@@ -29,21 +31,24 @@ enum class PerturbationType {
 
 inline std::string perturbation_name(PerturbationType type) {
     switch (type) {
-        case PerturbationType::MULTI_2OPT:        return "multi_2opt";
-        case PerturbationType::DOUBLE_BRIDGE:     return "double_bridge";
-        case PerturbationType::NODE_RELOCATION:   return "node_relocation";
-        case PerturbationType::SEGMENT_SHUFFLE:   return "segment_shuffle";
-        case PerturbationType::NODE_EXCHANGE:     return "node_exchange";
-        case PerturbationType::SEGMENT_RELOCATION:return "segment_relocation";
-        case PerturbationType::SEGMENT_EXCHANGE:  return "segment_exchange";
-        case PerturbationType::LARGE_2OPT:        return "large_2opt";
-        case PerturbationType::RUIN_RECREATE:     return "ruin_recreate";
+        case PerturbationType::DOUBLE_BRIDGE:      return "double_bridge";
+        case PerturbationType::NODE_RELOCATION:    return "node_relocation";
+        case PerturbationType::SEGMENT_SHUFFLE:    return "segment_shuffle";
+        case PerturbationType::NODE_EXCHANGE:      return "node_exchange";
+        case PerturbationType::SEGMENT_RELOCATION: return "segment_relocation";
+        case PerturbationType::SEGMENT_EXCHANGE:   return "segment_exchange";
+        case PerturbationType::LARGE_2OPT:         return "large_2opt";
+        case PerturbationType::RUIN_RECREATE:      return "ruin_recreate";
     }
     return "unknown";
 }
 
 class Perturbations {
 public:
+    /**
+     * @brief Returns a perturbed copy of `solution`.
+     * @param strength number of times the operator is applied (Ruin-Recreate: applied once, see ruin_recreate)
+     */
     static algorithm_result apply(
         const algorithm_data& data,
         const algorithm_result& solution,
@@ -53,287 +58,164 @@ public:
     ) {
         if (strength <= 0) return solution;
 
-        local_search_state state(solution.path, data.nodes_num);
-        int weight = solution.total_weight;
-
-        switch (type) {
-            case PerturbationType::DOUBLE_BRIDGE:
-                for (int i = 0; i < strength; ++i)
-                    double_bridge(data, state, weight, rng);
-                break;
-            case PerturbationType::NODE_RELOCATION:
-                for (int i = 0; i < strength; ++i)
-                    node_relocation(data, state, weight, rng);
-                break;
-            case PerturbationType::SEGMENT_SHUFFLE:
-                for (int i = 0; i < strength; ++i)
-                    segment_shuffle(data, state, weight, rng);
-                break;
-            case PerturbationType::NODE_EXCHANGE:
-                for (int i = 0; i < strength; ++i)
-                    node_exchange(data, state, weight, rng);
-                break;
-            case PerturbationType::SEGMENT_RELOCATION:
-                for (int i = 0; i < strength; ++i)
-                    segment_relocation(data, state, weight, rng);
-                break;
-            case PerturbationType::SEGMENT_EXCHANGE:
-                for (int i = 0; i < strength; ++i)
-                    segment_exchange(data, state, weight, rng);
-                break;
-            case PerturbationType::LARGE_2OPT:
-                for (int i = 0; i < strength; ++i)
-                    large_2opt(data, state, weight, rng);
-                break;
-            case PerturbationType::RUIN_RECREATE:
-                // One call already replaces a substantial fraction of the tour.
-                ruin_recreate(data, state, weight, rng);
-                break;
+        std::vector<int> cycle = solution.path;
+        std::vector<int> unselected;
+        if (type == PerturbationType::NODE_EXCHANGE || type == PerturbationType::RUIN_RECREATE) {
+            unselected = unselected_nodes(data, cycle);
         }
 
-        return {state.cycle(), weight};
+        if (type == PerturbationType::RUIN_RECREATE) {
+            // One call already replaces a substantial fraction of the tour.
+            ruin_recreate(cycle, unselected, rng);
+        } else {
+            for (int i = 0; i < strength; ++i) {
+                switch (type) {
+                    case PerturbationType::DOUBLE_BRIDGE:      double_bridge(cycle, rng); break;
+                    case PerturbationType::NODE_RELOCATION:    node_relocation(cycle, rng); break;
+                    case PerturbationType::SEGMENT_SHUFFLE:    segment_shuffle(cycle, rng); break;
+                    case PerturbationType::NODE_EXCHANGE:      node_exchange(cycle, unselected, rng); break;
+                    case PerturbationType::SEGMENT_RELOCATION: segment_relocation(cycle, rng); break;
+                    case PerturbationType::SEGMENT_EXCHANGE:   segment_exchange(cycle, rng); break;
+                    case PerturbationType::LARGE_2OPT:         large_2opt(cycle, rng); break;
+                    case PerturbationType::RUIN_RECREATE:      break;  // handled above
+                }
+            }
+        }
+
+        const int weight = cycle_weight(data, cycle);
+        return {std::move(cycle), weight};
     }
 
 private:
-    static long long calculate_distance(
-        const algorithm_data& data,
-        const std::vector<int>& order
-    ) {
-        long long total = 0;
-        const int m = static_cast<int>(order.size());
-        for (int i = 0; i < m; ++i)
-            total += data.distance_matrix[order[i]][order[(i + 1) % m]];
-        return total;
+    static int random_int(std::mt19937& rng, int low, int high) {
+        return std::uniform_int_distribution<int>(low, high)(rng);
     }
 
-    static void update_order(
-        const algorithm_data& data,
-        local_search_state& state,
-        int& weight,
-        const std::vector<int>& old_order,
-        const std::vector<int>& new_order
-    ) {
-        const long long old_distance = calculate_distance(data, old_order);
-        const long long new_distance = calculate_distance(data, new_order);
-        weight += static_cast<int>(new_distance - old_distance);
-
-        for (int i = 0; i < state.size(); ++i)
-            state.path[i + 1] = new_order[i];
-
-        state.sync_padding();
+    // objective: sum of cost_matrix over the edges (cost_matrix[i][j] includes the weight of j)
+    static int cycle_weight(const algorithm_data& data, const std::vector<int>& cycle) {
+        int weight = 0;
+        const std::size_t m = cycle.size();
+        for (std::size_t i = 0; i + 1 < m; ++i) weight += data.cost_matrix[cycle[i]][cycle[i + 1]];
+        if (m > 0) weight += data.cost_matrix[cycle[m - 1]][cycle[0]];
+        return weight;
     }
 
-    static std::vector<int> get_order(const local_search_state& state) {
-        return state.cycle();
-    }
-
-    static void double_bridge(
-        const algorithm_data& data, local_search_state& state,
-        int& weight, std::mt19937& rng
-    ) {
-        const int m = state.size();
-        if (m < 5) return;
-
-        const auto order = get_order(state);
-        const int a = std::uniform_int_distribution<int>(1, m - 4)(rng);
-        const int b = std::uniform_int_distribution<int>(a + 1, m - 3)(rng);
-        const int c = std::uniform_int_distribution<int>(b + 1, m - 2)(rng);
-        const int d = std::uniform_int_distribution<int>(c + 1, m - 1)(rng);
-
-        std::vector<int> result;
-        result.reserve(m);
-        result.insert(result.end(), order.begin(), order.begin() + a);
-        result.insert(result.end(), order.begin() + c, order.begin() + d);
-        result.insert(result.end(), order.begin() + b, order.begin() + c);
-        result.insert(result.end(), order.begin() + a, order.begin() + b);
-        result.insert(result.end(), order.begin() + d, order.end());
-
-        update_order(data, state, weight, order, result);
-    }
-
-    static void node_relocation(
-        const algorithm_data& data, local_search_state& state,
-        int& weight, std::mt19937& rng
-    ) {
-        const int m = state.size();
-        if (m < 3) return;
-
-        auto order = get_order(state);
-        const int from = std::uniform_int_distribution<int>(0, m - 1)(rng);
-        const int to = std::uniform_int_distribution<int>(0, m - 1)(rng);
-        if (from == to) return;
-
-        const int node = order[from];
-        order.erase(order.begin() + from);
-        order.insert(order.begin() + to, node);
-        update_order(data, state, weight, get_order(state), order);
-    }
-
-    static void segment_shuffle(
-        const algorithm_data& data, local_search_state& state,
-        int& weight, std::mt19937& rng
-    ) {
-        const int m = state.size();
-        if (m < 3) return;
-
-        auto order = get_order(state);
-        const int i = std::uniform_int_distribution<int>(0, m - 2)(rng);
-        const int j = std::uniform_int_distribution<int>(i + 1, m - 1)(rng);
-        const auto old_order = order;
-        std::shuffle(order.begin() + i, order.begin() + j + 1, rng);
-        update_order(data, state, weight, old_order, order);
-    }
-
-    static void node_exchange(
-        const algorithm_data& data, local_search_state& state,
-        int& weight, std::mt19937& rng
-    ) {
-        const int m = state.size();
-        if (m == 0 || state.unselected.empty()) return;
-
-        const int i = std::uniform_int_distribution<int>(1, m)(rng);
-        const int k = std::uniform_int_distribution<int>(
-            0, static_cast<int>(state.unselected.size()) - 1
-        )(rng);
-
-        const int v = state.path[i];
-        const int u = state.unselected[k];
-        const int p = state.path[i - 1];
-        const int n = state.path[i + 1];
-
-        const int delta =
-            data.cost_matrix[p][u] + data.distance_matrix[n][u] -
-            data.cost_matrix[p][v] - data.distance_matrix[n][v];
-
-        inter_node_swap(state, i, k);
-        weight += delta;
-    }
-
-    // Removes a contiguous block and reinserts it elsewhere, preserving its order.
-    static void segment_relocation(
-        const algorithm_data& data, local_search_state& state,
-        int& weight, std::mt19937& rng
-    ) {
-        const int m = state.size();
-        if (m < 5) return;
-
-        auto order = get_order(state);
-        const int max_len = std::max(2, m / 3);
-        const int len = std::uniform_int_distribution<int>(2, std::min(max_len, m - 1))(rng);
-        const int from = std::uniform_int_distribution<int>(0, m - len)(rng);
-
-        std::vector<int> block(order.begin() + from, order.begin() + from + len);
-        order.erase(order.begin() + from, order.begin() + from + len);
-
-        const int to = std::uniform_int_distribution<int>(
-            0, static_cast<int>(order.size())
-        )(rng);
-        order.insert(order.begin() + to, block.begin(), block.end());
-
-        update_order(data, state, weight, get_order(state), order);
-    }
-
-    // Swaps two disjoint blocks of equal length.
-    static void segment_exchange(
-        const algorithm_data& data, local_search_state& state,
-        int& weight, std::mt19937& rng
-    ) {
-        const int m = state.size();
-        if (m < 6) return;
-
-        const int max_len = std::max(2, m / 4);
-        const int len = std::uniform_int_distribution<int>(2, std::min(max_len, m / 2))(rng);
-
-        std::vector<std::pair<int, int>> starts;
-        for (int a = 0; a + len <= m; ++a)
-            for (int b = a + len; b + len <= m; ++b)
-                starts.emplace_back(a, b);
-
-        if (starts.empty()) return;
-        const auto chosen = starts[std::uniform_int_distribution<std::size_t>(
-            0, starts.size() - 1
-        )(rng)];
-
-        auto order = get_order(state);
-        const auto old_order = order;
-        std::swap_ranges(
-            order.begin() + chosen.first,
-            order.begin() + chosen.first + len,
-            order.begin() + chosen.second
-        );
-        update_order(data, state, weight, old_order, order);
-    }
-
-    // Reverses a randomly selected long segment (never the whole cycle).
-    static void large_2opt(
-        const algorithm_data& data, local_search_state& state,
-        int& weight, std::mt19937& rng
-    ) {
-        const int m = state.size();
-        if (m < 4) return;
-
-        auto order = get_order(state);
-        const int len = std::uniform_int_distribution<int>(3, m - 1)(rng);
-        const int from = std::uniform_int_distribution<int>(0, m - len)(rng);
-        const auto old_order = order;
-        std::reverse(order.begin() + from, order.begin() + from + len);
-        update_order(data, state, weight, old_order, order);
-    }
-
-   // Strong ruin-and-recreate: replace roughly one quarter of selected nodes
-// with currently unselected nodes at distinct tour positions.
-static void ruin_recreate(
-    const algorithm_data& data,
-    local_search_state& state,
-    int& weight,
-    std::mt19937& rng
-) {
-    const int m = state.size();
-
-    if (m == 0 || state.unselected.empty()) {
-        return;
-    }
-
-    const int count = std::min(
-        static_cast<int>(state.unselected.size()),
-        std::max(2, m / 8)
-    );
-
-    // Select distinct positions in the current tour.
-    std::vector<int> positions(m);
-    for (int i = 0; i < m; ++i) {
-        positions[i] = i + 1;
-    }
-
-    std::shuffle(positions.begin(), positions.end(), rng);
-
-    // Replace selected nodes with unselected nodes.
-    for (int i = 0; i < count; ++i) {
-        if (state.unselected.empty()) {
-            break;
+    static std::vector<int> unselected_nodes(const algorithm_data& data, const std::vector<int>& cycle) {
+        std::vector<char> selected(data.nodes_num, 0);
+        for (const int node : cycle) selected[node] = 1;
+        std::vector<int> unselected;
+        unselected.reserve(data.nodes_num - cycle.size());
+        for (int node = 0; node < data.nodes_num; ++node) {
+            if (!selected[node]) unselected.push_back(node);
         }
-
-        const int pos = positions[i];
-
-        const int k = std::uniform_int_distribution<int>(
-            0,
-            static_cast<int>(state.unselected.size()) - 1
-        )(rng);
-
-        inter_node_swap(state, pos, k);
+        return unselected;
     }
 
-    // Recalculate the complete objective after all replacements.
-    // This avoids accumulating incorrect deltas across multiple swaps.
-    weight = 0;
-
-    for (int i = 1; i <= m; ++i) {
-        const int prev = state.path[i - 1];
-        const int curr = state.path[i];
-        const int next = state.path[i + 1];
-
-        weight += data.cost_matrix[prev][curr]
-                + data.distance_matrix[next][curr];
+    // Classic double bridge: cuts the cycle into A B C D and reconnects it as A C B D
+    // (4 edges replaced, a move that can't be undone by a single 2-opt).
+    static void double_bridge(std::vector<int>& cycle, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m < 4) return;
+        const int p1 = random_int(rng, 1, m - 3);
+        const int p2 = random_int(rng, p1 + 1, m - 2);
+        const int p3 = random_int(rng, p2 + 1, m - 1);
+        // A = [0, p1), B = [p1, p2), C = [p2, p3), D = [p3, m)
+        std::rotate(cycle.begin() + p1, cycle.begin() + p2, cycle.begin() + p3);
     }
-}
+
+    // Moves one node to another position.
+    static void node_relocation(std::vector<int>& cycle, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m < 3) return;
+        const int from = random_int(rng, 0, m - 1);
+        const int to = random_int(rng, 0, m - 1);
+        if (from < to) {
+            std::rotate(cycle.begin() + from, cycle.begin() + from + 1, cycle.begin() + to + 1);
+        } else if (to < from) {
+            std::rotate(cycle.begin() + to, cycle.begin() + from, cycle.begin() + from + 1);
+        }
+    }
+
+    // Randomly reorders the nodes of a random segment [i, j] (of length 2..m).
+    static void segment_shuffle(std::vector<int>& cycle, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m < 3) return;
+        const int i = random_int(rng, 0, m - 2);
+        const int j = random_int(rng, i + 1, m - 1);
+        std::shuffle(cycle.begin() + i, cycle.begin() + j + 1, rng);
+    }
+
+    // Replaces a random selected node with a random unselected one.
+    static void node_exchange(std::vector<int>& cycle, std::vector<int>& unselected, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m == 0 || unselected.empty()) return;
+        const int i = random_int(rng, 0, m - 1);
+        const int k = random_int(rng, 0, static_cast<int>(unselected.size()) - 1);
+        std::swap(cycle[i], unselected[k]);  // the removed node becomes unselected
+    }
+
+    // Removes a contiguous block (2..m/3 nodes) and reinserts it elsewhere, preserving its order.
+    static void segment_relocation(std::vector<int>& cycle, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m < 5) return;
+        const int max_len = std::max(2, m / 3);
+        const int len = random_int(rng, 2, std::min(max_len, m - 1));
+        const int from = random_int(rng, 0, m - len);
+        // insertion index in the cycle without the block
+        const int to = random_int(rng, 0, m - len);
+        if (to < from) {
+            std::rotate(cycle.begin() + to, cycle.begin() + from, cycle.begin() + from + len);
+        } else if (to > from) {
+            std::rotate(cycle.begin() + from, cycle.begin() + from + len, cycle.begin() + to + len);
+        }
+    }
+
+    // Swaps two disjoint blocks of equal length (2..m/4). Blocks shorter than m/2 guarantee that the swap isn't
+    // just a rotation of the cycle (two halves swapped).
+    static void segment_exchange(std::vector<int>& cycle, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m < 6) return;
+        const int max_len = std::min(std::max(2, m / 4), (m - 1) / 2);
+        const int len = random_int(rng, 2, max_len);
+        // each (a, b) pair with a + len <= b, b + len <= m is chosen with equal probability:
+        // the number of valid b for a given a is m - 2 * len - a + 1, so draw a pair index and decode it
+        const int k = m - 2 * len + 1;              // number of valid a
+        const int pairs = k * (k + 1) / 2;
+        int index = random_int(rng, 0, pairs - 1);
+        int a = 0;
+        while (index >= k - a) {
+            index -= k - a;
+            ++a;
+        }
+        const int b = a + len + index;
+        std::swap_ranges(cycle.begin() + a, cycle.begin() + a + len, cycle.begin() + b);
+    }
+
+    // Reverses a random segment of 3..m-3 nodes. Reversing L nodes changes the same two edges as reversing the
+    // other m - L, so longer segments would only repeat these moves (m - 1 or m nodes: no change at all).
+    static void large_2opt(std::vector<int>& cycle, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m < 6) return;
+        const int len = random_int(rng, 3, m - 3);
+        const int from = random_int(rng, 0, m - len);
+        std::reverse(cycle.begin() + from, cycle.begin() + from + len);
+    }
+
+    // Replaces max(2, m / 8) selected nodes, at distinct positions, with distinct unselected nodes.
+    static void ruin_recreate(std::vector<int>& cycle, std::vector<int>& unselected, std::mt19937& rng) {
+        const int m = static_cast<int>(cycle.size());
+        if (m == 0 || unselected.empty()) return;
+        const int count = std::min({static_cast<int>(unselected.size()), m, std::max(2, m / 8)});
+
+        // partial Fisher-Yates: the first `count` entries become distinct random positions / unselected nodes,
+        // so a node removed here is never put back in the same call
+        std::vector<int> positions(m);
+        for (int i = 0; i < m; ++i) positions[i] = i;
+        const int u = static_cast<int>(unselected.size());
+        for (int i = 0; i < count; ++i) {
+            std::swap(positions[i], positions[random_int(rng, i, m - 1)]);
+            std::swap(unselected[i], unselected[random_int(rng, i, u - 1)]);
+            std::swap(cycle[positions[i]], unselected[i]);
+        }
+    }
 };

@@ -22,26 +22,6 @@
 // Neighbourhood is fixed to the best one from lab 3: intra edge exchange (2-opt) + inter node exchange,
 // optionally restricted to candidate moves (moves introducing at least one candidate edge, as in lab 4).
 class LocalSearchSteepestFast : public FixedLocalSearchBase {
-public:
-    using FixedLocalSearchBase::FixedLocalSearchBase;
-    using FixedLocalSearchBase::run;
-
-    // candidate lists of the instance the next runs are on; nullptr (default) -> full neighbourhood
-    void set_candidates(const CandidateLists* candidate_lists) { candidates = candidate_lists; }
-
-    algorithm_result run(const algorithm_data& data,
-                         std::string initial_solution_method,
-                         int initial_solution_start_node) override {
-        const algorithm_result initial = initial_solution(data, initial_solution_method, initial_solution_start_node);
-        return run_from_solution(data, initial);
-    }
-
-    // Used by ILS to improve an already perturbed solution.
-    algorithm_result run_from_solution(const algorithm_data& data, const algorithm_result& initial) {
-        return Search(data, initial, lm_buffer, candidates).run();
-    }
-
-private:
     // Stored by node ids (positions change after every 2-opt). 16 bytes instead of 24 with ints, which makes
     // passes over LM noticeably faster; node ids (< 200) easily fit in short.
     //  type 0 (2-opt):         remove edges a->b and c->d, add (a, c) and (b, d)
@@ -54,6 +34,59 @@ private:
         return {delta, short(type), short(a), short(b), short(c), short(d)};
     }
 
+public:
+    using FixedLocalSearchBase::FixedLocalSearchBase;
+    using FixedLocalSearchBase::run;
+
+    /**
+     * What is left in LM when a search ends in a local optimum: improving 2-opts that are not applicable there,
+     * because their edges are in the relatively inverted direction. Together with the local optimum itself it lets
+     * a search started from a perturbation of that optimum skip most of the initial evaluation
+     * (see Search::init_from_perturbation).
+     */
+    struct Memory {
+        std::vector<move_t> moves;
+    };
+
+    // candidate lists of the instance the next runs are on; nullptr (default) -> full neighbourhood
+    void set_candidates(const CandidateLists* candidate_lists) { candidates = candidate_lists; }
+
+    algorithm_result run(const algorithm_data& data,
+                         std::string initial_solution_method,
+                         int initial_solution_start_node) override {
+        const algorithm_result initial = initial_solution(data, initial_solution_method, initial_solution_start_node);
+        return run_from_solution(data, initial);
+    }
+
+    // Search from a random solution; the final LM is saved to `memory` (if given).
+    algorithm_result run_random(const algorithm_data& data, Memory* memory) {
+        return run_from_solution(data, initial_solution(data, "random", 0), memory);
+    }
+
+    // Search from the given solution, evaluating all its moves.
+    algorithm_result run_from_solution(const algorithm_data& data, const algorithm_result& initial,
+                                       Memory* memory = nullptr) {
+        Search search(data, initial, lm_buffer, candidates);
+        search.init_full();
+        return search.run(memory);
+    }
+
+    /**
+     * Search from `perturbed`, a perturbation of `local_optimum` (a result of this search, `memory` being its final
+     * LM). Ends in exactly the same local optimum as run_from_solution(data, perturbed), but evaluates only the moves
+     * that the perturbation could have made improving. Used by ILS.
+     */
+    algorithm_result run_from_perturbation(const algorithm_data& data, const algorithm_result& perturbed,
+                                           const algorithm_result& local_optimum, const Memory& memory,
+                                           Memory* out_memory = nullptr) {
+        // with candidate moves a local optimum isn't optimal w.r.t. all moves, so the reasoning doesn't hold
+        if (candidates) return run_from_solution(data, perturbed, out_memory);
+        Search search(data, perturbed, lm_buffer, candidates);
+        search.init_from_perturbation(local_optimum.path, memory.moves);
+        return search.run(out_memory);
+    }
+
+private:
     // memory of LM, kept between runs so it's allocated (and paged in) only once
     std::vector<move_t> lm_buffer;
     const CandidateLists* candidates = nullptr;
@@ -86,11 +119,11 @@ private:
             for (int i = 1; i <= m; ++i) pos[path[i]] = i;
             for (int k = 0; k < static_cast<int>(state.unselected.size()); ++k) upos[state.unselected[k]] = k;
             lm.clear();  // keeps the capacity from previous runs
-            lm.reserve(m * m);
+            lm.reserve(static_cast<std::size_t>(m) * m);
         }
 
-        algorithm_result run() {
-            // evaluate all moves applicable to the initial solution
+        // evaluate all moves applicable to the initial solution
+        void init_full() {
             for (int i = 1; i <= m; ++i) {
                 if (candidates) {
                     for (const int* it = candidates->begin(path[i]); it != candidates->end(path[i]); ++it) {
@@ -105,7 +138,53 @@ private:
                     add_node_moves(path[i]);
                 }
             }
+        }
 
+        /**
+         * Initial LM for a perturbation of `base_path`, a local optimum of the full neighbourhood whose final LM
+         * was `base_moves`. A move applicable now can be improving only if:
+         *  - it's a 2-opt removing a new edge (one not in base_path) -> paired with all edges, both reconnections,
+         *  - it's a 2-opt removing two old edges whose relative direction got flipped: in the optimum it was the
+         *    relatively inverted move, so if improving it's in base_moves,
+         *  - it's an exchange of a node with a new edge, or of a node unselected by the perturbation.
+         * Any other move was applicable in the optimum with the same delta (deltas depend only on the 4 nodes), so it
+         * isn't improving. LM ends up with all improving moves, as after init_full, and the search takes the same
+         * moves: the best one is picked by delta and scan order, not by LM order.
+         */
+        void init_from_perturbation(const std::vector<int>& base_path, const std::vector<move_t>& base_moves) {
+            const int n = static_cast<int>(pos.size());
+            const int bm = static_cast<int>(base_path.size());
+            std::vector<int> old_next(n, -1), old_prev(n, -1);
+            for (int i = 0; i < bm; ++i) {
+                const int x = base_path[i], y = base_path[(i + 1) % bm];
+                old_next[x] = y;
+                old_prev[y] = x;
+            }
+
+            lm.insert(lm.end(), base_moves.begin(), base_moves.end());  // threshold is min -> all outside front
+
+            // done[j]: new edge (j, j + 1) already paired with all edges, so later new edges skip it (each pair of
+            // new edges is evaluated once, then a perturbation replacing most edges costs no more than init_full)
+            std::vector<char> touched(n, 0), done(m + 2, 0);
+            for (int i = 1; i <= m; ++i) {
+                const int a = path[i], b = path[i + 1];
+                if (old_next[a] == b || old_prev[a] == b) continue;  // old edge
+                add_edge_moves<true>(a, b, 1, done.data());
+                done[i] = 1;
+                touched[a] = touched[b] = 1;
+            }
+            for (int i = 1; i <= m; ++i) {
+                if (touched[path[i]]) add_node_moves(path[i]);
+            }
+            for (const int u : state.unselected) {
+                if (old_next[u] < 0) continue;  // was unselected in the optimum too
+                for (int q = 1; q <= m; ++q) add_exchange(path[q], u);
+            }
+        }
+
+        // Applies the best improving move until there is none. The final LM (only not applicable moves are left)
+        // goes to `memory`, if given.
+        algorithm_result run(Memory* memory) {
             while (true) {
                 const auto [best, status] = best_in_front();
                 if (status == REMOVE) {
@@ -121,6 +200,8 @@ private:
                     apply_exchange(mv);
                 }
             }
+            // lm is the shared buffer: swapping hands it over without a copy, the old memory buffer gets reused
+            if (memory) std::swap(memory->moves, lm);
             return {state.cycle(), total_weight};
         }
 
@@ -180,12 +261,18 @@ private:
         // Pairs the current edge a->b with the edges (path[i], path[i + 1]), i = first..m. For edges a->b and
         // c->d both reconnections are evaluated. The second one, (a, d) + (b, c), is the move with relatively
         // inverted edges: it's saved as a->b, d->c, so it's skipped until some reversal flips one of these edges.
-        void add_edge_moves(int a, int b, int first = 1) {
+        // With Skip, edges i with skip[i] != 0 are left out (a template parameter keeps the check out of the
+        // hot loop of the search itself).
+        template <bool Skip = false>
+        void add_edge_moves(int a, int b, int first = 1, const char* skip = nullptr) {
             const int* da = dist[a].data();
             const int* db = dist[b].data();
             for (int i = first; i <= m; ++i) {
                 const int c = path[i], d = path[i + 1];
                 if (c == a || c == b || d == a) continue;  // the same or adjacent edges
+                if constexpr (Skip) {
+                    if (skip[i]) continue;
+                }
                 const int removed = da[b] + dist[c][d];
                 if (const int delta = da[c] + db[d] - removed; delta < 0) add(make_move(delta, 0, a, b, c, d));
                 if (const int delta = da[d] + db[c] - removed; delta < 0) add(make_move(delta, 0, a, b, d, c));
