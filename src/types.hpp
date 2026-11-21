@@ -30,3 +30,11 @@ struct algorithm_result {
     std::vector<int> path;
     int total_weight = 0;
 };
+
+/// One improvement of an iterated method (ILS, LNS): after `iteration` iterations of the main loop (0 = the initial
+/// local search) and `microseconds` of running time, the current solution has `objective`.
+struct progress_point {
+    int iteration = 0;
+    long long microseconds = 0;
+    int objective = 0;
+};

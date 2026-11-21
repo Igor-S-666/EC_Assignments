@@ -31,6 +31,7 @@
 
 #include "../utils/checker/solution_checker.hpp"
 #include "../utils/parsing/data_parser.hpp"
+#include "../utils/performance/high_performance.hpp"
 
 using clock_type = std::chrono::steady_clock;
 
@@ -98,6 +99,8 @@ void validate(const algorithm_data& data, const algorithm_result& result, const 
 }
 
 int main() {
+    // without it Windows may throttle the process (EcoQoS) at random moments, see high_performance.hpp
+    std::cout << "Performance setup: " << request_high_performance() << '\n';
     const std::vector<std::string> instances = {"TSPA", "TSPB"};
     const std::vector<PerturbationType> perturbations = {
         PerturbationType::DOUBLE_BRIDGE,

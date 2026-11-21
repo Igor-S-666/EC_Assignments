@@ -6,6 +6,7 @@
 #pragma once
 
 #include <chrono>
+#include <limits>
 #include <random>
 #include <utility>
 
@@ -39,30 +40,41 @@ public:
      * @param perturbation Selected perturbation.
      * @param strength Perturbation strength.
      * @param seed Random seed for perturbations.
+     * @param progress if given, gets a point for the initial solution and for every improvement
+     * @param max_iterations additional stopping condition: number of perturbation + LS iterations (default: none)
      */
     ils_result run(
         const algorithm_data& data,
         std::chrono::microseconds time_limit,
         PerturbationType perturbation,
         int strength,
-        unsigned seed
+        unsigned seed,
+        std::vector<progress_point>* progress = nullptr,
+        int max_iterations = std::numeric_limits<int>::max()
     ) {
         using clock_type = std::chrono::steady_clock;
 
         std::mt19937 rng(seed);
 
         const auto start = clock_type::now();
+        auto record = [&](int iteration, int objective) {
+            if (progress) {
+                const auto us = std::chrono::duration_cast<std::chrono::microseconds>(clock_type::now() - start);
+                progress->push_back({iteration, us.count(), objective});
+            }
+        };
 
         // final LMs of the current solution and of the last candidate
         LocalSearchSteepestFast::Memory current_memory, candidate_memory;
 
         algorithm_result current = local_search.run_random(data, &current_memory);
+        record(0, current.total_weight);
 
         algorithm_result best = current;
 
         int local_search_runs = 1;
 
-        while (clock_type::now() - start < time_limit) {
+        while (clock_type::now() - start < time_limit && local_search_runs - 1 < max_iterations) {
 
             // Perturb current local optimum.
             algorithm_result candidate = Perturbations::apply(
@@ -90,6 +102,7 @@ public:
             if (candidate.total_weight < current.total_weight) {
                 current = std::move(candidate);
                 std::swap(current_memory, candidate_memory);
+                record(local_search_runs - 1, current.total_weight);  // iterations = LS runs after the initial one
             }
         }
 

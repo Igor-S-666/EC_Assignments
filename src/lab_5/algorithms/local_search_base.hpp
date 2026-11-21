@@ -25,6 +25,8 @@ public:
 
     virtual algorithm_result run(const algorithm_data& data,
                                  std::string initial_solution_method,
+                                 std::string destroy_method,
+                                 std::string repair_method,
                                  int initial_solution_start_node) = 0;
 
     algorithm_result run(const algorithm_data& data) override {
