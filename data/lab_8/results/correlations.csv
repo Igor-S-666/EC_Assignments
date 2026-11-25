@@ -1,0 +1,13 @@
+instance;version;measure;sample_size;pearson_r
+TSPA;average;edges;1000;-0.6585
+TSPA;average;nodes;1000;-0.4282
+TSPA;best1000;edges;999;-0.3649
+TSPA;best1000;nodes;999;-0.2688
+TSPA;reference;edges;1000;-0.6156
+TSPA;reference;nodes;1000;-0.6690
+TSPB;average;edges;1000;-0.6700
+TSPB;average;nodes;1000;-0.4916
+TSPB;best1000;edges;999;-0.4143
+TSPB;best1000;nodes;999;-0.5263
+TSPB;reference;edges;1000;-0.5940
+TSPB;reference;nodes;1000;-0.6371

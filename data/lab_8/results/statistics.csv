@@ -1,0 +1,3 @@
+instance;min;max;average;reference;reference_method
+TSPA;73741;79922;76277.26;71484;ILS_double_bridge_strength_4
+TSPB;50121;56283;52884.18;48149;ILS_segment_relocation_strength_4
